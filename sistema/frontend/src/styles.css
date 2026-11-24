@@ -69,7 +69,10 @@ button { cursor: pointer; }
   font-weight: 600;
   color: var(--texto);
 }
+.login-card.largo { width: min(440px, 100%); }
 .login-card .sub { color: var(--mudo); margin: 0 0 20px; line-height: 1.45; font-size: 14px; }
+.troca-acesso { margin: 14px 0 0; text-align: center; }
+.troca-acesso button { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 500; }
 .kicker {
   margin: 0;
   color: var(--mudo);
@@ -436,6 +439,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .nota p { margin: 4px 0 0; font-weight: 400; }
 .webhook { font-weight: 500; word-break: break-all; }
 .estoque-item { display: grid; grid-template-columns: 1fr 240px; gap: 12px; align-items: start; }
+.estoque-topo { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
+.foto-estoque, .marca-estoque { width: 48px; height: 48px; flex: none; object-fit: cover; border-radius: 2px; background: var(--fundo); display: grid; place-items: center; font-weight: 600; color: var(--mudo); }
+.estoque-item .btn { margin-top: 8px; }
 
 @media print {
   .sidebar, .btn, #toast, .topo-movel, .menu-fundo { display: none !important; }

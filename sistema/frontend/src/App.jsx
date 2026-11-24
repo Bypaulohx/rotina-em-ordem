@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, Menu } from "lucide-react";
-import { intervaloAgenda, isoDate, isoLocal, mensagemErro } from "./format.js";
+import { intervaloAgenda, isoDate, isoLocal, mascaraMoeda, mascaraTelefone, mensagemErro, moedaParaNumero } from "./format.js";
 import {
   AbrirCaixaModal,
   AgendamentoModal,
@@ -84,6 +84,13 @@ export default function App() {
   const [login, setLogin] = useState("");
   const [senha, setSenha] = useState("");
   const [erroLogin, setErroLogin] = useState("");
+  const [modoAcesso, setModoAcesso] = useState("login");
+  const [empresa, setEmpresa] = useState("");
+  const [slogan, setSlogan] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [tolerancia, setTolerancia] = useState("15");
+  const [taxa, setTaxa] = useState("20,00");
+  const [responsavel, setResponsavel] = useState("");
   const [toast, setToast] = useState("");
   const toastTimer = useRef();
   const pedido = useRef(0);
@@ -144,8 +151,17 @@ export default function App() {
         setPessoas(lista);
         setSessao("dentro");
       })
-      .catch(() => {
-        if (vivo) setSessao("fora");
+      .catch(async () => {
+        if (!vivo) return;
+        try {
+          const estado = await api("/api/estado");
+          if (!vivo) return;
+          setModoAcesso(estado.pronta ? "login" : "cadastro");
+        } catch {
+          if (!vivo) return;
+          setModoAcesso("login");
+        }
+        setSessao("fora");
       });
     return () => { vivo = false; };
   }, [api]);
@@ -180,19 +196,46 @@ export default function App() {
     return () => window.removeEventListener("keydown", tecla);
   }, []);
 
+  async function entrarNaLoja(usuario) {
+    setSenha("");
+    setMe(usuario);
+    setPage(primeiraPagina(usuario.papel));
+    setCatalogo(await api("/api/catalogo"));
+    setPessoas(await api("/api/pessoas"));
+    setSessao("dentro");
+  }
+
   async function entrar(evento) {
     evento.preventDefault();
     setErroLogin("");
     try {
-      const usuario = await api("/api/login", { method: "POST", body: { login: login.trim(), senha } });
-      setSenha("");
-      setMe(usuario);
-      setPage(primeiraPagina(usuario.papel));
-      setCatalogo(await api("/api/catalogo"));
-      setPessoas(await api("/api/pessoas"));
-      setSessao("dentro");
+      await entrarNaLoja(await api("/api/login", { method: "POST", body: { login: login.trim(), senha } }));
     } catch (erro) {
       setErroLogin(erro.message || "Não foi possível entrar.");
+    }
+  }
+
+  async function cadastrar(evento) {
+    evento.preventDefault();
+    setErroLogin("");
+    const minutos = Number(tolerancia);
+    try {
+      const usuario = await api("/api/cadastro", {
+        method: "POST",
+        body: {
+          empresa: empresa.trim(),
+          slogan: slogan.trim(),
+          whatsapp,
+          tolerancia_busca_min: Number.isFinite(minutos) ? minutos : -1,
+          valor_atraso: moedaParaNumero(taxa),
+          responsavel: responsavel.trim(),
+          login: login.trim(),
+          senha,
+        },
+      });
+      await entrarNaLoja(usuario);
+    } catch (erro) {
+      setErroLogin(erro.message || "Não foi possível cadastrar a empresa.");
     }
   }
 
@@ -386,16 +429,39 @@ export default function App() {
       {sessao !== "dentro" || !me || !catalogo ? (
         <main className="login">
           {sessao === "checando" ? <p className="muted">Carregando a rotina...</p> : (
-            <section className="login-card">
+            <section className={`login-card${modoAcesso === "cadastro" ? " largo" : ""}`}>
               <p className="kicker">Rotina em ordem</p>
-              <h1>A rotina do pet shop, em ordem.</h1>
-              <p className="sub">A vaga de verdade é a baia. O horário só entra se o porte couber até a hora da busca.</p>
-              <form onSubmit={entrar}>
-                <label className="field"><span>Login</span><input name="login" value={login} onChange={(evento) => setLogin(evento.target.value)} autoComplete="username" required /></label>
-                <label className="field"><span>Senha</span><input name="senha" type="password" value={senha} onChange={(evento) => setSenha(evento.target.value)} autoComplete="current-password" required /></label>
-                {erroLogin ? <p className="alerta">{erroLogin}</p> : null}
-                <button className="btn" type="submit">Entrar</button>
-              </form>
+              {modoAcesso === "cadastro" ? (
+                <>
+                  <h1>Cadastrar a empresa</h1>
+                  <p className="sub">O nome aparece no menu, o WhatsApp recebe os avisos e a tolerância vale na hora da busca.</p>
+                  <form onSubmit={cadastrar}>
+                    <label className="field"><span>Nome da empresa</span><input value={empresa} onChange={(evento) => setEmpresa(evento.target.value)} autoComplete="organization" required /></label>
+                    <label className="field"><span>Frase da loja</span><input value={slogan} onChange={(evento) => setSlogan(evento.target.value)} maxLength={120} /></label>
+                    <label className="field"><span>WhatsApp com DDD</span><input inputMode="tel" value={whatsapp} onChange={(evento) => setWhatsapp(mascaraTelefone(evento.target.value))} placeholder="(00) 00000-0000" /></label>
+                    <label className="field"><span>Tolerância da busca (minutos)</span><input inputMode="numeric" value={tolerancia} onChange={(evento) => setTolerancia(evento.target.value.replace(/\D/g, "").slice(0, 3))} required /></label>
+                    <label className="field"><span>Taxa de atraso</span><input inputMode="numeric" value={taxa} onChange={(evento) => setTaxa(mascaraMoeda(evento.target.value))} required /></label>
+                    <label className="field"><span>Seu nome</span><input value={responsavel} onChange={(evento) => setResponsavel(evento.target.value)} autoComplete="name" required /></label>
+                    <label className="field"><span>Login</span><input value={login} onChange={(evento) => setLogin(evento.target.value)} autoComplete="username" required /></label>
+                    <label className="field"><span>Senha</span><input type="password" value={senha} onChange={(evento) => setSenha(evento.target.value)} autoComplete="new-password" required /></label>
+                    {erroLogin ? <p className="alerta">{erroLogin}</p> : null}
+                    <button className="btn" type="submit">Criar a loja</button>
+                  </form>
+                  <p className="troca-acesso"><button type="button" onClick={() => { setModoAcesso("login"); setErroLogin(""); }}>Já tenho login</button></p>
+                </>
+              ) : (
+                <>
+                  <h1>Entrar</h1>
+                  <p className="sub">Use o login criado para a sua equipe.</p>
+                  <form onSubmit={entrar}>
+                    <label className="field"><span>Login</span><input name="login" value={login} onChange={(evento) => setLogin(evento.target.value)} autoComplete="username" required /></label>
+                    <label className="field"><span>Senha</span><input name="senha" type="password" value={senha} onChange={(evento) => setSenha(evento.target.value)} autoComplete="current-password" required /></label>
+                    {erroLogin ? <p className="alerta">{erroLogin}</p> : null}
+                    <button className="btn" type="submit">Entrar</button>
+                  </form>
+                  <p className="troca-acesso"><button type="button" onClick={() => { setModoAcesso("cadastro"); setErroLogin(""); }}>Cadastrar a empresa</button></p>
+                </>
+              )}
             </section>
           )}
         </main>

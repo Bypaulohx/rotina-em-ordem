@@ -270,21 +270,99 @@ function Catalogo({ api, run }) {
   );
 }
 
+function siglaProduto(nome) {
+  const partes = String(nome || "").trim().split(/\s+/).slice(0, 2);
+  return partes.map((parte) => parte.slice(0, 1).toUpperCase()).join("") || "•";
+}
+
+async function enviarFotoProduto(produtoId, arquivo) {
+  const corpo = new FormData();
+  corpo.append("arquivo", arquivo);
+  const resposta = await fetch(`/api/produtos/${produtoId}/foto`, { method: "POST", credentials: "same-origin", body: corpo });
+  const json = await resposta.json().catch(() => ({}));
+  if (!resposta.ok) {
+    const erro = new Error(json?.detail?.mensagem || "Não foi possível guardar a foto.");
+    erro.status = resposta.status;
+    throw erro;
+  }
+  return json;
+}
+
 function Estoque({ api, run }) {
   const { dados, erro, carregar } = useCarga(api, "/api/estoque");
+  const [aberto, setAberto] = useState(false);
+  const [nome, setNome] = useState("");
+  const [preco, setPreco] = useState("");
+  const [estoqueInicial, setEstoqueInicial] = useState("0");
+  const [minimo, setMinimo] = useState("1");
+  const [arquivo, setArquivo] = useState(null);
   const aviso = espera(erro, dados);
   return (
     <>
-      <Cabecalho kicker="Balcão" titulo="Estoque" sub="O que entra e o que sai. Quando a quantidade chega no mínimo, o boletim do dia avisa a equipe." />
+      <Cabecalho kicker="Balcão" titulo="Estoque" sub="O que entra e o que sai. Quando a quantidade chega no mínimo, o boletim do dia avisa a equipe.">
+        <button className="btn" type="button" onClick={() => setAberto((atual) => !atual)}>{aberto ? "Fechar" : "Cadastrar produto"}</button>
+      </Cabecalho>
+      {aberto ? (
+        <form className="lista" onSubmit={(evento) => {
+          evento.preventDefault();
+          run(async () => {
+            const criado = await api("/api/produtos", {
+              method: "POST",
+              body: { nome, preco: Number(preco), estoque: Number(estoqueInicial), minimo: Number(minimo) },
+            });
+            let falha = null;
+            if (arquivo && criado.criado) {
+              try {
+                await enviarFotoProduto(criado.criado, arquivo);
+              } catch (erro) {
+                falha = erro;
+              }
+            }
+            setNome("");
+            setPreco("");
+            setEstoqueInicial("0");
+            setMinimo("1");
+            setArquivo(null);
+            setAberto(false);
+            await carregar();
+            if (falha) throw falha;
+          });
+        }}>
+          <h2>Novo produto</h2>
+          <label className="field"><span>Nome</span><input required value={nome} onChange={(evento) => setNome(evento.target.value)} /></label>
+          <label className="field"><span>Preço</span><input required type="number" min="0" step="0.01" value={preco} onChange={(evento) => setPreco(evento.target.value)} /></label>
+          <label className="field"><span>Estoque inicial</span><input type="number" min="0" value={estoqueInicial} onChange={(evento) => setEstoqueInicial(evento.target.value)} /></label>
+          <label className="field"><span>Mínimo</span><input type="number" min="0" value={minimo} onChange={(evento) => setMinimo(evento.target.value)} /></label>
+          <label className="field"><span>Foto</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(evento) => setArquivo(evento.target.files?.[0] || null)} /></label>
+          <button className="btn" type="submit">Salvar produto</button>
+        </form>
+      ) : null}
       {aviso || (dados.length ? dados.map((produto) => (
         <article className="lista estoque-item" key={produto.id}>
           <div>
-            <strong>{produto.nome}</strong>
-            <div className="muted">{moeda(produto.preco)} · mínimo {produto.minimo}</div>
+            <div className="estoque-topo">
+              {produto.foto ? <img className="foto-estoque" src={produto.foto} alt="" /> : <span className="marca-estoque">{siglaProduto(produto.nome)}</span>}
+              <div>
+                <strong>{produto.nome}</strong>
+                <div className="muted">{moeda(produto.preco)} · mínimo {produto.minimo}</div>
+              </div>
+            </div>
             <div className={produto.baixo ? "credito" : "muted"}>{produto.estoque} unidade(s){produto.baixo ? " · abaixo do mínimo" : ""}</div>
             {produto.movimentos.map((mov, indice) => (
               <small className="muted" key={`${produto.id}-${indice}`}>{mov.quantidade > 0 ? "+" : ""}{mov.quantidade} · {mov.motivo}</small>
             ))}
+            <label className="btn pequeno ghost">
+              {produto.foto ? "Trocar foto" : "Colocar foto"}
+              <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(evento) => {
+                const escolhido = evento.target.files?.[0];
+                evento.target.value = "";
+                if (!escolhido) return;
+                run(async () => {
+                  await enviarFotoProduto(produto.id, escolhido);
+                  await carregar();
+                });
+              }} />
+            </label>
           </div>
           <form onSubmit={(evento) => {
             evento.preventDefault();
@@ -306,7 +384,7 @@ function Estoque({ api, run }) {
             </div>
           </form>
         </article>
-      )) : <Vazio icone={Package} titulo="Estoque ainda vazio" texto="Inclua um produto no catálogo. A quantidade e o mínimo passam a aparecer aqui." />)}
+      )) : <Vazio icone={Package} titulo="Estoque ainda vazio" texto="Cadastre o primeiro produto. A quantidade e o mínimo passam a aparecer aqui." />)}
     </>
   );
 }

@@ -5,7 +5,7 @@ from datetime import datetime
 from .database import SessionLocal
 from .models import Atividade, Sessao
 
-IGNORAR = {"/api/login", "/api/logout", "/api/whatsapp/webhook"}
+IGNORAR = {"/api/login", "/api/logout", "/api/cadastro", "/api/estado", "/api/whatsapp/webhook"}
 
 
 def descrever(method: str, path: str) -> str:
@@ -35,6 +35,8 @@ def descrever(method: str, path: str) -> str:
         return "Suspendeu uma venda"
     if partes[0] == "lembretes" and len(partes) >= 3:
         return "Concluiu um lembrete"
+    if partes[0] == "produtos" and len(partes) >= 3 and partes[2] == "foto":
+        return "Atualizou a foto de um produto"
     return {
         ("POST", "agendamentos"): "Criou um agendamento",
         ("POST", "hospedagens"): "Criou uma hospedagem",

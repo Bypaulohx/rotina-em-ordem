@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -26,6 +26,7 @@ from .gestao import (
     movimentar_estoque,
     prontuario,
     receber_whatsapp,
+    salvar_foto_produto,
     salvar_whatsapp,
     whatsapp_painel,
 )
@@ -137,6 +138,17 @@ def ver_catalogo(db: Session = Depends(get_db), _: Usuario = Depends(usuario_atu
 @router.post("/produtos")
 def novo_produto(dados: ProdutoIn, db: Session = Depends(get_db), _: Usuario = Depends(usuario_atual)):
     return _chamar(criar_produto, db, dados.nome, dados.preco, dados.estoque, dados.minimo)
+
+
+@router.post("/produtos/{produto_id}/foto")
+async def foto_produto(produto_id: int, arquivo: UploadFile = File(...), db: Session = Depends(get_db), _: Usuario = Depends(usuario_atual)):
+    extensao = ".jpg"
+    if arquivo.filename and "." in arquivo.filename:
+        candidato = "." + arquivo.filename.rsplit(".", 1)[-1].lower()
+        if candidato in {".jpg", ".jpeg", ".png", ".webp"}:
+            extensao = ".jpg" if candidato == ".jpeg" else candidato
+    conteudo = await arquivo.read()
+    return _chamar(salvar_foto_produto, db, produto_id, conteudo, extensao)
 
 
 @router.patch("/servicos/{servico_id}")

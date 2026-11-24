@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import secrets
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -26,6 +27,8 @@ from .models import (
 from .rules import RegraNegocio
 from .security import hash_senha
 from . import services
+
+UPLOADS = Path(__file__).resolve().parent.parent / "uploads"
 
 
 def _iso(valor: datetime | date | None) -> str:
@@ -222,9 +225,29 @@ def criar_produto(db: Session, nome: str, preco: float, estoque: int, minimo: in
         raise RegraNegocio("Dê um nome ao produto.", 400)
     if preco < 0 or estoque < 0 or minimo < 0:
         raise RegraNegocio("Preço, estoque e mínimo não podem ser negativos.", 400)
-    db.add(Produto(nome=limpo, preco=preco, estoque=estoque, minimo=minimo, ativo=True))
+    produto = Produto(nome=limpo, preco=preco, estoque=estoque, minimo=minimo, ativo=True)
+    db.add(produto)
     db.commit()
-    return catalogo_loja(db)
+    db.refresh(produto)
+    resposta = catalogo_loja(db)
+    resposta["criado"] = produto.id
+    return resposta
+
+
+def salvar_foto_produto(db: Session, produto_id: int, conteudo: bytes, extensao: str) -> dict:
+    produto = db.get(Produto, produto_id)
+    if produto is None or not produto.ativo:
+        raise RegraNegocio("Produto não encontrado.", 404)
+    if not conteudo:
+        raise RegraNegocio("A foto veio vazia.", 400)
+    if len(conteudo) > 2_000_000:
+        raise RegraNegocio("A foto precisa ter até 2 MB.", 400)
+    UPLOADS.mkdir(exist_ok=True)
+    nome = f"produto-{produto.id}{extensao}"
+    (UPLOADS / nome).write_bytes(conteudo)
+    produto.foto = f"/uploads/{nome}"
+    db.commit()
+    return {"id": produto.id, "foto": produto.foto}
 
 
 def estoque(db: Session) -> list[dict]:
@@ -245,6 +268,7 @@ def estoque(db: Session) -> list[dict]:
                 "estoque": produto.estoque,
                 "minimo": produto.minimo,
                 "baixo": produto.estoque <= produto.minimo,
+                "foto": produto.foto or "",
                 "movimentos": movimentos,
             }
         )

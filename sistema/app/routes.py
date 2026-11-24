@@ -12,13 +12,24 @@ from .database import get_db
 from .models import ConfigLoja, Sessao, Usuario
 from .rules import RegraNegocio
 from .security import verificar_senha
-from . import services
+from . import seed, services
 
 router = APIRouter(prefix="/api")
 COOKIE = "sessao"
 
 
 class LoginIn(BaseModel):
+    login: str
+    senha: str
+
+
+class CadastroIn(BaseModel):
+    empresa: str
+    slogan: str = ""
+    whatsapp: str = ""
+    tolerancia_busca_min: int = 15
+    valor_atraso: float = 20
+    responsavel: str
     login: str
     senha: str
 
@@ -137,11 +148,7 @@ def _chamar(funcao, *args, **kwargs):
         raise HTTPException(status_code=erro.status, detail={"mensagem": erro.mensagem, **erro.extra}) from erro
 
 
-@router.post("/login")
-def login(dados: LoginIn, response: Response, db: Session = Depends(get_db)):
-    usuario = db.query(Usuario).filter(Usuario.login == dados.login.strip()).first()
-    if usuario is None or not verificar_senha(dados.senha, usuario.senha_hash):
-        raise HTTPException(status_code=401, detail={"mensagem": "Login ou senha não conferem."})
+def _sessao(usuario: Usuario, response: Response, db: Session) -> dict:
     token = secrets.token_urlsafe(32)
     db.add(Sessao(token=token, usuario_id=usuario.id, expira_em=datetime.now() + timedelta(days=7)))
     db.commit()
@@ -154,6 +161,40 @@ def login(dados: LoginIn, response: Response, db: Session = Depends(get_db)):
         "loja": loja.nome if loja and loja.nome else "",
         "slogan": loja.slogan if loja and loja.slogan else "",
     }
+
+
+@router.get("/estado")
+def estado(db: Session = Depends(get_db)):
+    loja = db.get(ConfigLoja, 1)
+    return {
+        "pronta": db.query(Usuario).first() is not None,
+        "loja": loja.nome if loja and loja.nome else "",
+    }
+
+
+@router.post("/cadastro")
+def cadastro(dados: CadastroIn, response: Response, db: Session = Depends(get_db)):
+    usuario = _chamar(
+        seed.abrir_loja,
+        db,
+        dados.empresa,
+        dados.slogan,
+        dados.whatsapp,
+        dados.tolerancia_busca_min,
+        dados.valor_atraso,
+        dados.responsavel,
+        dados.login,
+        dados.senha,
+    )
+    return _sessao(usuario, response, db)
+
+
+@router.post("/login")
+def login(dados: LoginIn, response: Response, db: Session = Depends(get_db)):
+    usuario = db.query(Usuario).filter(Usuario.login == dados.login.strip()).first()
+    if usuario is None or not verificar_senha(dados.senha, usuario.senha_hash):
+        raise HTTPException(status_code=401, detail={"mensagem": "Login ou senha não conferem."})
+    return _sessao(usuario, response, db)
 
 
 @router.post("/logout")
