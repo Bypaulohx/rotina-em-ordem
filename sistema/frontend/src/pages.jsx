@@ -351,10 +351,7 @@ function Vendas({ dados, busca, acoes }) {
   return (
     <>
       <Cabecalho kicker="Balcão" titulo="Vendas" sub="Cada recebimento nasce de uma busca, de um checkout ou de um pacote. E entra no caixa que está aberto.">
-        <span className="acoes">
-          <button className="btn ghost" type="button" onClick={() => acoes.ir("pdv")}>Frente de caixa</button>
-          <button className="btn" type="button" onClick={acoes.abrirVenda}>+ Nova venda</button>
-        </span>
+        <button className="btn" type="button" onClick={acoes.abrirVenda}>+ Nova venda</button>
       </Cabecalho>
       {(dados || []).length ? <input className="busca" placeholder="Buscar venda ou cliente..." value={busca} onChange={(evento) => acoes.buscaVenda(evento.target.value)} /> : null}
       {vendas.length ? vendas.map((venda) => (
@@ -416,54 +413,37 @@ function CaixaAberto({ caixa, api, aoMudar, aoFechar }) {
   );
 }
 
-function Caixas({ dados, acoes, api }) {
-  const caixas = dados || [];
+function Caixas({ dados, acoes, api, pessoas, me }) {
+  const caixas = Array.isArray(dados) ? dados : (dados?.caixas || []);
+  const aberto = caixas.find((caixa) => caixa.status === "aberto");
   return (
     <>
       <Cabecalho kicker="Movimento de caixa" titulo="Caixas e turnos">
-        {caixas.length ? null : <button className="btn" type="button" onClick={acoes.abrirCaixa}>+ Abrir caixa</button>}
+        {aberto ? null : <button className="btn" type="button" onClick={acoes.abrirCaixa}>+ Abrir caixa</button>}
       </Cabecalho>
-      {caixas.length ? caixas.map((caixa) => (
-        <article className="caixa" key={caixa.id}>
-          <div className="icone-suave"><Wallet {...ICONE} /></div>
-          <div>
-            <strong>{caixa.nome}</strong>
+      {aberto ? (
+        <Frente embutida dados={{ produtos: dados?.produtos || [], caixa: aberto, suspensas: dados?.suspensas || [] }} pessoas={pessoas} me={me} api={api} acoes={acoes}>
+          <details className="turno-detalhe">
+            <summary>Turno · inicial {moeda(aberto.saldo_inicial)}</summary>
             <div className="muted">
-              Aberto em {diaMes(caixa.aberto_em)} {horaDe(caixa.aberto_em)}
-              {caixa.operador ? ` por ${caixa.operador}` : ""} · inicial {moeda(caixa.saldo_inicial)}
-            </div>
-            <div className="muted">
-              {Object.keys(caixa.por_forma || {}).length
-                ? Object.entries(caixa.por_forma).map(([forma, total]) => <div key={forma}>{ROTULOS_FORMA[forma] || forma} · {moeda(total)}</div>)
+              {Object.keys(aberto.por_forma || {}).length
+                ? Object.entries(aberto.por_forma).map(([forma, total]) => <div key={forma}>{ROTULOS_FORMA[forma] || forma} · {moeda(total)}</div>)
                 : "Sem vendas neste caixa."}
             </div>
-            {caixa.status === "aberto" ? null : <div className="muted">Dinheiro esperado na gaveta: {moeda(caixa.esperado_em_dinheiro)}</div>}
-            {caixa.saldo_informado != null ? <div>{caixa.fechado_por ? `Contado por ${caixa.fechado_por}` : "Contado"}: {moeda(caixa.saldo_informado)} · diferença {moeda(caixa.diferenca)}</div> : null}
-            {(caixa.vendas || []).length ? (
-              <div className="vendas-caixa">
-                {caixa.vendas.map((venda) => (
-                  <div className="item" key={venda.id}>
-                    <div>
-                      <strong>{horaDe(venda.criada_em)} · {venda.cliente}</strong>
-                      <small>{(venda.itens || []).map((item) => `${item.quantidade && item.quantidade !== 1 ? `${item.quantidade}× ` : ""}${item.descricao}`).join(" · ")} · {ROTULOS_FORMA[venda.forma] || venda.forma}</small>
-                    </div>
-                    <strong>{moeda(venda.total)}</strong>
-                  </div>
-                ))}
+            {(aberto.vendas || []).map((venda) => (
+              <div className="item" key={venda.id}>
+                <div>
+                  <strong>{horaDe(venda.criada_em)} · {venda.cliente}</strong>
+                  <small>{(venda.itens || []).map((item) => item.descricao).join(" · ")}</small>
+                </div>
+                <strong>{moeda(venda.total)}</strong>
               </div>
-            ) : null}
-            {(caixa.movimentos || []).length ? (
-              <div className="muted">
-                {caixa.movimentos.map((mov) => <div key={mov.id}>{mov.tipo} · {mov.motivo || "sem motivo"} · {moeda(mov.valor)}</div>)}
-              </div>
-            ) : null}
-            {caixa.status === "aberto" ? (
-              <CaixaAberto caixa={caixa} api={api} aoMudar={acoes.recarregar} aoFechar={() => acoes.fecharCaixa(caixa)} />
-            ) : null}
-          </div>
-          <div className="lado"><Pill status={caixa.status} /></div>
-        </article>
-      )) : <Vazio icone={Wallet} titulo="Nenhum caixa seu está aberto" texto="O caixa de outra pessoa não aparece aqui. Abra o seu para receber." acao={acoes.abrirCaixa} rotulo="Abrir caixa" />}
+            ))}
+            {(aberto.movimentos || []).map((mov) => <div className="muted" key={mov.id}>{mov.tipo} · {mov.motivo || "sem motivo"} · {moeda(mov.valor)}</div>)}
+            <CaixaAberto caixa={aberto} api={api} aoMudar={acoes.recarregar} aoFechar={() => acoes.fecharCaixa(aberto)} />
+          </details>
+        </Frente>
+      ) : <Vazio icone={Wallet} titulo="Nenhum caixa seu está aberto" texto="O caixa de outra pessoa não aparece aqui. Abra o seu para vender, sangrar e fechar o turno." acao={acoes.abrirCaixa} rotulo="Abrir caixa" />}
     </>
   );
 }
@@ -563,8 +543,7 @@ export default function Pagina(props) {
   if (page === "painel") return <Painel {...props} />;
   if (page === "mapa") return <Mapa {...props} />;
   if (page === "agenda") return <Agenda {...props} />;
-  if (page === "pdv") return <Frente dados={dados} pessoas={pessoas} me={props.me} api={props.api} acoes={props.acoes} />;
   if (page === "vendas") return <Vendas dados={dados} busca={props.buscaVenda} acoes={props.acoes} />;
-  if (page === "caixas") return <Caixas dados={dados} acoes={props.acoes} api={props.api} />;
+  if (page === "caixas" || page === "pdv") return <Caixas dados={dados} acoes={props.acoes} api={props.api} pessoas={pessoas} me={props.me} />;
   return null;
 }

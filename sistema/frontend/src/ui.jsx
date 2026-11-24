@@ -1,4 +1,4 @@
-import { BarChart3, Bell, BookOpen, Calendar, Clock, Landmark, LayoutGrid, Map, MessageCircle, NotebookPen, Package, PawPrint, Receipt, ScrollText, Shield, ShoppingBag, Users, Wallet } from "lucide-react";
+import { BarChart3, Bell, BookOpen, Calendar, Clock, Landmark, LayoutGrid, Map, MessageCircle, NotebookPen, Package, PawPrint, ScrollText, Shield, ShoppingBag, Users, Wallet } from "lucide-react";
 import { STATUS } from "./format.js";
 
 export const GRUPOS = [
@@ -6,10 +6,9 @@ export const GRUPOS = [
     ["painel", "Visão geral", LayoutGrid],
     ["mapa", "Mapa de baias", Map],
     ["agenda", "Agenda & hotel", Calendar],
-    ["pdv", "Frente de caixa", Receipt],
     ["vendas", "Vendas", ShoppingBag],
     ["pets", "Pets & clientes", PawPrint],
-    ["caixas", "Caixas", Wallet],
+    ["caixas", "Caixas e turnos", Wallet],
   ]],
   ["Loja", [
     ["boletins", "Boletins", ScrollText],
@@ -28,12 +27,12 @@ export const GRUPOS = [
 ];
 
 export const ACESSOS = {
-  gerente: ["painel", "mapa", "agenda", "pdv", "vendas", "pets", "boletins", "lembretes", "catalogo", "estoque", "financeiro", "indicadores", "whatsapp", "ponto"],
-  recepcao: ["painel", "mapa", "agenda", "pdv", "vendas", "pets", "caixas", "whatsapp"],
-  equipe: ["painel", "mapa", "agenda", "pdv", "vendas", "pets", "caixas", "whatsapp"],
+  gerente: ["painel", "mapa", "agenda", "vendas", "pets", "boletins", "lembretes", "catalogo", "estoque", "financeiro", "indicadores", "whatsapp", "ponto"],
+  recepcao: ["painel", "mapa", "agenda", "vendas", "pets", "caixas", "whatsapp"],
+  equipe: ["painel", "mapa", "agenda", "vendas", "pets", "caixas", "whatsapp"],
   tosador: ["painel", "mapa", "agenda", "pets", "boletins", "lembretes"],
   veterinario: ["agenda", "pets", "boletins", "prontuario", "lembretes"],
-  estoquista: ["vendas", "pdv", "pets", "catalogo", "estoque"],
+  estoquista: ["vendas", "pets", "catalogo", "estoque"],
 };
 
 export const ROTULOS_PAPEL = {

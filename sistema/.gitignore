@@ -35,6 +35,12 @@ frontend/.vite/
 
 uploads/
 rotina.db
+pata_demo.db
+.pata-credenciais.txt
 *.db
 
 APRESENTACAO.md
+apresentacao.md
+tests/
+pytest.ini
+frontend/DESIGN.md

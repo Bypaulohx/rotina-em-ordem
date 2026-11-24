@@ -19,15 +19,24 @@ SessionLocal = None
 
 
 def database_url() -> str:
-    return os.environ.get("ROTINA_DB") or f"sqlite:///{DB_PATH.as_posix()}"
+    url = os.environ.get("DATABASE_URL") or os.environ.get("ROTINA_DB") or f"sqlite:///{DB_PATH.as_posix()}"
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    return url
 
 
 def configure(url: str | None = None) -> None:
     global engine, SessionLocal
     url = url or database_url()
-    kwargs = {"connect_args": {"check_same_thread": False}}
-    if url == "sqlite://":
-        kwargs["poolclass"] = StaticPool
+    kwargs = {}
+    if url.startswith("sqlite"):
+        kwargs["connect_args"] = {"check_same_thread": False}
+        if url == "sqlite://":
+            kwargs["poolclass"] = StaticPool
+    else:
+        kwargs["pool_pre_ping"] = True
     engine = create_engine(url, **kwargs)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
@@ -42,6 +51,8 @@ def migrar() -> None:
         "config": {
             "whatsapp": "VARCHAR(20) DEFAULT ''",
             "whatsapp_token": "VARCHAR(64) DEFAULT ''",
+            "nome": "VARCHAR(80) DEFAULT ''",
+            "slogan": "VARCHAR(120) DEFAULT ''",
         },
         "usuarios": {
             "papel": "VARCHAR(20) DEFAULT 'admin'",
@@ -92,6 +103,7 @@ def migrar() -> None:
             "validade": "DATE",
             "fornecedor_id": "INTEGER",
             "unidade": "VARCHAR(8) DEFAULT 'un'",
+            "foto": "VARCHAR(200) DEFAULT ''",
         },
         "despesas": {
             "status": "VARCHAR(20) DEFAULT 'paga'",

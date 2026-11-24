@@ -56,15 +56,13 @@ async function buscarPagina(api, { page, modo, cursor }) {
     return { dados: await api(`/api/agenda?de=${isoDate(de)}&ate=${isoDate(ate)}`) };
   }
   if (page === "vendas") return { dados: await api("/api/vendas") };
-  if (page === "pdv") {
+  if (page === "caixas" || page === "pdv") {
+    const caixas = await api("/api/caixas");
     const produtos = await api("/api/pdv/produtos");
-    let caixa = null;
     let suspensas = [];
-    try { caixa = (await api("/api/caixas"))[0] || null; } catch { caixa = null; }
     try { suspensas = await api("/api/pdv/suspensas"); } catch { suspensas = []; }
-    return { dados: { produtos, caixa, suspensas } };
+    return { dados: { caixas, produtos, suspensas } };
   }
-  if (page === "caixas") return { dados: await api("/api/caixas") };
   if (page === "pets") return { pessoas: await api("/api/pessoas") };
   return {};
 }
@@ -83,6 +81,9 @@ export default function App() {
   const [sugestao, setSugestao] = useState(null);
   const [modal, setModal] = useState(null);
   const [menuAberto, setMenuAberto] = useState(false);
+  const [login, setLogin] = useState("");
+  const [senha, setSenha] = useState("");
+  const [erroLogin, setErroLogin] = useState("");
   const [toast, setToast] = useState("");
   const toastTimer = useRef();
   const pedido = useRef(0);
@@ -150,6 +151,10 @@ export default function App() {
   }, [api]);
 
   useEffect(() => {
+    if (page === "pdv") setPage("caixas");
+  }, [page]);
+
+  useEffect(() => {
     if (sessao !== "dentro" || !catalogo) return undefined;
     const ticket = ++pedido.current;
     buscarPagina(api, { page, modo, cursor })
@@ -177,15 +182,18 @@ export default function App() {
 
   async function entrar(evento) {
     evento.preventDefault();
-    const dados = new FormData(evento.target);
-    await run(async () => {
-      const usuario = await api("/api/login", { method: "POST", body: { login: dados.get("login"), senha: dados.get("senha") } });
+    setErroLogin("");
+    try {
+      const usuario = await api("/api/login", { method: "POST", body: { login: login.trim(), senha } });
+      setSenha("");
       setMe(usuario);
       setPage(primeiraPagina(usuario.papel));
       setCatalogo(await api("/api/catalogo"));
       setPessoas(await api("/api/pessoas"));
       setSessao("dentro");
-    });
+    } catch (erro) {
+      setErroLogin(erro.message || "Não foi possível entrar.");
+    }
   }
 
   function encaixar() {
@@ -383,11 +391,11 @@ export default function App() {
               <h1>A rotina do pet shop, em ordem.</h1>
               <p className="sub">A vaga de verdade é a baia. O horário só entra se o porte couber até a hora da busca.</p>
               <form onSubmit={entrar}>
-                <label className="field"><span>Login</span><input name="login" defaultValue="paulo" autoComplete="username" required /></label>
-                <label className="field"><span>Senha</span><input name="senha" type="password" defaultValue="rotina" autoComplete="current-password" required /></label>
+                <label className="field"><span>Login</span><input name="login" value={login} onChange={(evento) => setLogin(evento.target.value)} autoComplete="username" required /></label>
+                <label className="field"><span>Senha</span><input name="senha" type="password" value={senha} onChange={(evento) => setSenha(evento.target.value)} autoComplete="current-password" required /></label>
+                {erroLogin ? <p className="alerta">{erroLogin}</p> : null}
                 <button className="btn" type="submit">Entrar</button>
               </form>
-              <p className="hint">Demonstração da equipe: paulo / rotina</p>
             </section>
           )}
         </main>
@@ -397,11 +405,11 @@ export default function App() {
             <button className="icon-btn" type="button" aria-label="Abrir menu" aria-expanded={menuAberto} onClick={() => setMenuAberto((aberto) => !aberto)}>
               <Menu {...ICONE} />
             </button>
-            <strong>Rotina em ordem</strong>
+            <strong>{me.loja || "Rotina em ordem"}</strong>
           </header>
           <div className="menu-fundo" onClick={() => setMenuAberto(false)} />
           <aside className="sidebar">
-            <div className="brand"><strong>Rotina em ordem</strong><small>Banho, tosa e hotel</small></div>
+            <div className="brand">{me.loja ? <img className="logo-loja" src="/uploads/pata/logo.svg" alt="" /> : null}<div><strong>{me.loja || "Rotina em ordem"}</strong><small>{me.slogan || "Banho, tosa e hotel"}</small></div></div>
             <nav className="nav">
               {GRUPOS.map(([grupo, itens]) => {
                 const visiveis = itens.filter(([id]) => pode(me.papel, id));

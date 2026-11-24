@@ -12,7 +12,7 @@ function estoqueDe(produto) {
   return String(produto.estoque);
 }
 
-export default function Frente({ dados, pessoas, me, api, acoes }) {
+export default function Frente({ dados, pessoas, me, api, acoes, embutida = false, children = null }) {
   const produtos = dados?.produtos || [];
   const caixa = dados?.caixa || null;
   const suspensas = dados?.suspensas || [];
@@ -256,11 +256,13 @@ export default function Frente({ dados, pessoas, me, api, acoes }) {
     <div className="frente">
       <section className="frente-catalogo">
         <header className="frente-topo">
-          <div>
-            <p className="kicker">Frente de caixa</p>
-            <h1>Rotina em ordem</h1>
-            <p className="muted">{me?.nome} · {caixa ? caixa.nome : "Nenhum caixa aberto"} · {agora.toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
-          </div>
+          {embutida ? null : (
+            <div>
+              <p className="kicker">Frente de caixa</p>
+              <h1>Rotina em ordem</h1>
+            </div>
+          )}
+          <p className="muted">{me?.nome} · {caixa ? caixa.nome : "Nenhum caixa aberto"} · {agora.toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
           <p className="atalhos">F2 busca · F3 cliente · F4 quantidade · F6 suspender · F8 preço · F10 receber</p>
         </header>
         <div className="frente-busca">
@@ -312,7 +314,7 @@ export default function Frente({ dados, pessoas, me, api, acoes }) {
         <div className="frente-grade-produtos">
           {visiveis.map((produto) => (
             <button className={`produto-card ${produto.esgotado ? "esgotado" : ""}`} type="button" key={produto.id} onClick={() => escolher(produto)}>
-              <span className="marca-produto">{sigla(produto.nome)}</span>
+              {produto.foto ? <img className="foto-produto" src={produto.foto} alt="" /> : <span className="marca-produto">{sigla(produto.nome)}</span>}
               <strong>{produto.nome}</strong>
               <span>{produto.marca || produto.categoria || (produto.unidade === "kg" ? "Por peso" : "Unidade")}</span>
               <em>{moeda(produto.preco)}{produto.unidade === "kg" ? "/kg" : ""}</em>
@@ -418,6 +420,7 @@ export default function Frente({ dados, pessoas, me, api, acoes }) {
           <button className="btn ghost" type="button" onClick={suspender} disabled={!carrinho.length}>Suspender</button>
           <button className="btn" type="button" onClick={receber} disabled={!carrinho.length || !clienteId || !caixa}>Receber {moeda(liquido)}</button>
         </div>
+        {children}
       </aside>
     </div>
   );

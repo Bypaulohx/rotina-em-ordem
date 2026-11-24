@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .models import Sessao, Usuario
+from .models import ConfigLoja, Sessao, Usuario
 from .rules import RegraNegocio
 from .security import verificar_senha
 from . import services
@@ -146,7 +146,14 @@ def login(dados: LoginIn, response: Response, db: Session = Depends(get_db)):
     db.add(Sessao(token=token, usuario_id=usuario.id, expira_em=datetime.now() + timedelta(days=7)))
     db.commit()
     response.set_cookie(COOKIE, token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 7)
-    return {"nome": usuario.nome, "login": usuario.login, "papel": usuario.papel or "admin"}
+    loja = db.get(ConfigLoja, 1)
+    return {
+        "nome": usuario.nome,
+        "login": usuario.login,
+        "papel": usuario.papel or "admin",
+        "loja": loja.nome if loja and loja.nome else "",
+        "slogan": loja.slogan if loja and loja.slogan else "",
+    }
 
 
 @router.post("/logout")
@@ -162,8 +169,17 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
 
 
 @router.get("/me")
-def me(usuario: Usuario = Depends(usuario_atual)):
-    return {"nome": usuario.nome, "login": usuario.login, "papel": usuario.papel or "admin"}
+def me(db: Session = Depends(get_db), usuario: Usuario = Depends(usuario_atual)):
+    from .models import ConfigLoja
+
+    loja = db.get(ConfigLoja, 1)
+    return {
+        "nome": usuario.nome,
+        "login": usuario.login,
+        "papel": usuario.papel or "admin",
+        "loja": loja.nome if loja and loja.nome else "",
+        "slogan": loja.slogan if loja and loja.slogan else "",
+    }
 
 
 @router.get("/painel")

@@ -61,6 +61,7 @@ def _produto_dict(produto: Produto) -> dict:
         "baixo": produto.estoque <= produto.minimo,
         "esgotado": produto.estoque <= 0,
         "unidade": produto.unidade or "un",
+        "foto": produto.foto or "",
     }
 
 
@@ -309,6 +310,7 @@ def cancelar_venda(db: Session, venda_id: int, usuario) -> dict:
             quantidade = item.gramas or item.quantidade or 0
             if produto is None or quantidade < 1:
                 continue
+            db.refresh(produto)
             produto.estoque += quantidade
             db.add(MovimentoEstoque(produto_id=produto.id, quantidade=quantidade, motivo=f"Cancelamento da venda {venda.numero:05d}", usuario_id=usuario.id))
     venda.status = "cancelada"

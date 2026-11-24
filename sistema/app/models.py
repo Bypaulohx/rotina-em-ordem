@@ -44,6 +44,8 @@ class ConfigLoja(Base):
     valor_atraso: Mapped[float] = mapped_column(Float, default=20)
     whatsapp: Mapped[str] = mapped_column(String(20), default="")
     whatsapp_token: Mapped[str] = mapped_column(String(64), default="")
+    nome: Mapped[str] = mapped_column(String(80), default="")
+    slogan: Mapped[str] = mapped_column(String(120), default="")
 
 
 class Cliente(Base):
@@ -280,6 +282,7 @@ class Produto(Base):
     validade: Mapped[date | None] = mapped_column(Date, nullable=True)
     fornecedor_id: Mapped[int | None] = mapped_column(ForeignKey("fornecedores.id"), nullable=True)
     unidade: Mapped[str] = mapped_column(String(8), default="un")
+    foto: Mapped[str] = mapped_column(String(200), default="")
 
 
 class MovimentoEstoque(Base):

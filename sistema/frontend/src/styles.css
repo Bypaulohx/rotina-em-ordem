@@ -107,7 +107,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   height: 100vh;
   overflow: hidden;
 }
-.brand { padding: 4px 10px 16px; }
+.brand { display: flex; align-items: center; gap: 8px; padding: 4px 10px 16px; }
+.logo-loja { width: 28px; height: 28px; border-radius: 2px; background: #fff; }
 .brand strong { display: block; font-size: 15px; letter-spacing: -0.02em; color: #fff; }
 .brand small { color: #9aa39d; }
 .menu-label {
@@ -380,7 +381,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-.frente { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.frente { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; margin-top: 16px; }
 .frente h1 { margin: 0; font-size: 22px; letter-spacing: -0.02em; }
 .frente-topo { display: flex; justify-content: space-between; gap: 16px; align-items: end; margin-bottom: 12px; }
 .atalhos { margin: 0; color: var(--mudo); font-size: 12px; text-align: right; }
@@ -395,12 +396,14 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .produto-card span, .produto-card small { color: var(--mudo); font-size: 12px; }
 .produto-card em { font-style: normal; font-weight: 600; font-variant-numeric: tabular-nums; }
 .produto-card.esgotado { opacity: 0.55; }
-.marca-produto { width: 100%; height: 72px; display: grid; place-items: center; background: var(--fundo); border-radius: 2px; font-weight: 600; letter-spacing: 0.04em; color: var(--mudo); }
+.marca-produto, .foto-produto { width: 100%; height: 72px; display: grid; place-items: center; background: var(--fundo); border-radius: 2px; font-weight: 600; letter-spacing: 0.04em; color: var(--mudo); object-fit: cover; }
 .frente-pedido { position: sticky; top: 8px; background: #fff; border: 1px solid var(--linha); border-radius: var(--raio); padding: 14px; max-height: calc(100vh - 96px); overflow: auto; }
 .frente-pedido h2 { margin: 0 0 10px; font-size: 18px; }
 .frente-totais { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 12px 0; font-variant-numeric: tabular-nums; }
 .frente-total { font-size: 22px; }
 .frente-acoes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.turno-detalhe { margin-top: 14px; border-top: 1px solid var(--linha); padding-top: 10px; }
+.turno-detalhe summary { cursor: pointer; font-weight: 500; margin-bottom: 8px; }
 .peso-barra, .consulta-preco { display: flex; gap: 8px; align-items: center; background: #fff; border: 1px solid var(--linha); border-radius: 2px; padding: 8px 10px; margin-bottom: 10px; }
 .peso-barra input { width: 110px; }
 .consulta-preco { margin: 0 0 10px; }
