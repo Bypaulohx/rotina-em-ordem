@@ -11,4 +11,6 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: rotina-em-ordem
+          property: connectionString
