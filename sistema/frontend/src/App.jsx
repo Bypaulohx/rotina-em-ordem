@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, Menu } from "lucide-react";
-import { intervaloAgenda, isoDate, isoLocal, mascaraMoeda, mascaraTelefone, mensagemErro, moedaParaNumero } from "./format.js";
+import { aplicarCor, intervaloAgenda, isoDate, isoLocal, mascaraMoeda, mascaraTelefone, mensagemErro, moedaParaNumero, PALETA } from "./format.js";
 import {
   AbrirCaixaModal,
   AgendamentoModal,
@@ -91,6 +91,8 @@ export default function App() {
   const [tolerancia, setTolerancia] = useState("15");
   const [taxa, setTaxa] = useState("20,00");
   const [responsavel, setResponsavel] = useState("");
+  const [cor, setCor] = useState("#1f6b4a");
+  const [logoArquivo, setLogoArquivo] = useState(null);
   const [toast, setToast] = useState("");
   const toastTimer = useRef();
   const pedido = useRef(0);
@@ -171,6 +173,10 @@ export default function App() {
   }, [page]);
 
   useEffect(() => {
+    aplicarCor(me?.cor);
+  }, [me]);
+
+  useEffect(() => {
     if (sessao !== "dentro" || !catalogo) return undefined;
     const ticket = ++pedido.current;
     buscarPagina(api, { page, modo, cursor })
@@ -231,9 +237,19 @@ export default function App() {
           responsavel: responsavel.trim(),
           login: login.trim(),
           senha,
+          cor,
         },
       });
-      await entrarNaLoja(usuario);
+      let perfil = usuario;
+      if (logoArquivo) {
+        const corpo = new FormData();
+        corpo.append("arquivo", logoArquivo);
+        const resposta = await fetch("/api/marca/logo", { method: "POST", credentials: "same-origin", body: corpo });
+        const json = await resposta.json().catch(() => ({}));
+        if (resposta.ok) perfil = { ...usuario, logo: json.logo, cor: json.cor || cor };
+        else avisar(json.detail || "A loja foi criada. A logo pode ser enviada depois, em Marca.");
+      }
+      await entrarNaLoja(perfil);
     } catch (erro) {
       setErroLogin(erro.message || "Não foi possível cadastrar a empresa.");
     }
@@ -437,6 +453,8 @@ export default function App() {
                   <p className="sub">O nome aparece no menu, o WhatsApp recebe os avisos e a tolerância vale na hora da busca.</p>
                   <form onSubmit={cadastrar}>
                     <label className="field"><span>Nome da empresa</span><input value={empresa} onChange={(evento) => setEmpresa(evento.target.value)} autoComplete="organization" required /></label>
+                    <div className="field"><span>Cor da marca</span><div className="paleta">{PALETA.map(([valor]) => <button key={valor} type="button" className={cor === valor ? "ativa" : ""} style={{ background: valor }} aria-label={valor} onClick={() => setCor(valor)} />)}</div></div>
+                    <label className="field"><span>Logo</span><input type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" onChange={(evento) => setLogoArquivo(evento.target.files?.[0] || null)} /></label>
                     <label className="field"><span>Frase da loja</span><input value={slogan} onChange={(evento) => setSlogan(evento.target.value)} maxLength={120} /></label>
                     <label className="field"><span>WhatsApp com DDD</span><input inputMode="tel" value={whatsapp} onChange={(evento) => setWhatsapp(mascaraTelefone(evento.target.value))} placeholder="(00) 00000-0000" /></label>
                     <label className="field"><span>Tolerância da busca (minutos)</span><input inputMode="numeric" value={tolerancia} onChange={(evento) => setTolerancia(evento.target.value.replace(/\D/g, "").slice(0, 3))} required /></label>
@@ -475,7 +493,7 @@ export default function App() {
           </header>
           <div className="menu-fundo" onClick={() => setMenuAberto(false)} />
           <aside className="sidebar">
-            <div className="brand">{me.loja ? <img className="logo-loja" src="/uploads/pata/logo.svg" alt="" /> : null}<div><strong>{me.loja || "Rotina em ordem"}</strong><small>{me.slogan || "Banho, tosa e hotel"}</small></div></div>
+            <div className="brand">{me.logo ? <img className="logo-loja" src={me.logo} alt="" /> : null}<div><strong>{me.loja || "Rotina em ordem"}</strong><small>{me.slogan || "Banho, tosa e hotel"}</small></div></div>
             <nav className="nav">
               {GRUPOS.map(([grupo, itens]) => {
                 const visiveis = itens.filter(([id]) => pode(me.papel, id));
@@ -518,6 +536,7 @@ export default function App() {
               api={api}
               run={run}
               me={me}
+              onMarca={(perfil) => setMe((atual) => atual ? { ...atual, loja: perfil.nome, slogan: perfil.slogan, logo: perfil.logo, cor: perfil.cor } : atual)}
             />
           </main>
         </div>

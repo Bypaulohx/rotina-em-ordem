@@ -4,6 +4,7 @@ import {
   MESES_CURTOS,
   ROTULOS_FORMA,
   diaMes,
+  documento,
   gradeMes,
   horaDe,
   inicioSemana,
@@ -13,6 +14,7 @@ import {
   moedaParaNumero,
   parseData,
   tituloMes,
+  tabelaItens,
   cobreHotel,
 } from "./format.js";
 import Gestao, { eGestao } from "./gestao.jsx";
@@ -365,6 +367,12 @@ function Vendas({ dados, busca, acoes }) {
             <strong>{moeda(venda.total)}</strong>
             <Pill status={venda.status} />
             <div className="muted">{diaMes(venda.criada_em)}</div>
+            {venda.status === "paga" ? (
+              <div className="acoes">
+                <button className="btn pequeno ghost" type="button" onClick={() => documento(`Recibo ${venda.numero}`, `<p>${venda.cliente}</p>${tabelaItens(venda.itens, venda.total)}`, "Recibo da venda recebida na loja.")}>Recibo</button>
+                <button className="btn pequeno ghost" type="button" onClick={() => documento(`Espelho ${venda.numero}`, `<p>${venda.cliente} · ${venda.forma_rotulo}</p>${tabelaItens(venda.itens, venda.total)}`, "Espelho para conferência da venda. Não é NFC-e nem NF-e autorizada.")}>Espelho</button>
+              </div>
+            ) : null}
           </div>
         </article>
       )) : <Vazio icone={Wallet} titulo={(dados || []).length ? "Nenhuma venda com esse termo" : "Nenhuma venda ainda"} texto={(dados || []).length ? "Tente outro nome, número ou o que foi vendido." : "A primeira venda nasce de uma busca, de um checkout ou de um pacote."} acao={(dados || []).length ? undefined : acoes.abrirVenda} rotulo="Nova venda" />}
@@ -537,7 +545,7 @@ function Pets({ pessoas, acoes, api }) {
 
 export default function Pagina(props) {
   const { page, dados, pessoas } = props;
-  if (eGestao(page)) return <Gestao page={page} api={props.api} run={props.run} me={props.me} pessoas={pessoas} />;
+  if (eGestao(page)) return <Gestao page={page} api={props.api} run={props.run} me={props.me} pessoas={pessoas} onMarca={props.onMarca} />;
   if (page === "pets") return <Pets pessoas={pessoas} acoes={props.acoes} api={props.api} />;
   if (!dados) return <p className="muted">Carregando a rotina...</p>;
   if (page === "painel") return <Painel {...props} />;

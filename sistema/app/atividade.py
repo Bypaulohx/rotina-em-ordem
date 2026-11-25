@@ -37,6 +37,14 @@ def descrever(method: str, path: str) -> str:
         return "Concluiu um lembrete"
     if partes[0] == "produtos" and len(partes) >= 3 and partes[2] == "foto":
         return "Atualizou a foto de um produto"
+    if partes[0] == "estoque" and len(partes) >= 2 and partes[1] == "importar":
+        return "Importou produtos de um arquivo"
+    if partes[0] == "marca" and len(partes) >= 2 and partes[1] == "logo":
+        return "Atualizou a logo da loja"
+    if partes[0] == "marca":
+        return "Atualizou a marca da loja"
+    if partes[0] == "orcamentos":
+        return "Criou um orçamento"
     return {
         ("POST", "agendamentos"): "Criou um agendamento",
         ("POST", "hospedagens"): "Criou uma hospedagem",

@@ -13,7 +13,9 @@ from .plataforma import (
     adicionar_pet,
     atualizar_ficha_pet,
     criar_conta,
+    atualizar_fornecedor,
     criar_fornecedor,
+    listar_fornecedores,
     exigir_gestao,
     ficha_cliente,
     ficha_pet,
@@ -119,6 +121,13 @@ class FornecedorIn(BaseModel):
     nome: str
     telefone: str = ""
     email: str = ""
+
+
+class ContratoFornecedorIn(BaseModel):
+    cpf: str = ""
+    dia_vencimento: int = 5
+    contrato: str = "indefinido"
+    contrato_fim: date | None = None
 
 
 class ContaIn(BaseModel):
@@ -288,9 +297,19 @@ def ver_indicadores(
     return _chamar(indicadores, db, inicio, ate or hoje)
 
 
+@router.get("/fornecedores")
+def ver_fornecedores(db: Session = Depends(get_db), _: Usuario = Depends(_gestao)):
+    return listar_fornecedores(db)
+
+
 @router.post("/fornecedores")
 def fornecedor(dados: FornecedorIn, db: Session = Depends(get_db), _: Usuario = Depends(_gestao)):
     return _chamar(criar_fornecedor, db, dados.nome, dados.telefone, dados.email)
+
+
+@router.patch("/fornecedores/{fornecedor_id}")
+def contrato_fornecedor(fornecedor_id: int, dados: ContratoFornecedorIn, db: Session = Depends(get_db), _: Usuario = Depends(_gestao)):
+    return _chamar(atualizar_fornecedor, db, fornecedor_id, dados.cpf, dados.dia_vencimento, dados.contrato, dados.contrato_fim)
 
 
 @router.post("/contas")

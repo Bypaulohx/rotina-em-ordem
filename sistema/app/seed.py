@@ -63,6 +63,7 @@ def abrir_loja(
     responsavel: str,
     login: str,
     senha: str,
+    cor: str = "#1f6b4a",
 ) -> Usuario:
     if db.query(Usuario).first():
         raise RegraNegocio("Esta loja já foi cadastrada. Entre com o login da equipe.", 409)
@@ -89,6 +90,7 @@ def abrir_loja(
     cfg.whatsapp = telefone
     cfg.tolerancia_busca_min = tolerancia
     cfg.valor_atraso = round(float(valor_atraso), 2)
+    cfg.cor = cor if len(cor) == 7 and cor.startswith("#") else "#1f6b4a"
     if telefone and not cfg.whatsapp_token:
         cfg.whatsapp_token = secrets.token_urlsafe(18)
     if not telefone:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -16,9 +17,14 @@ from .gestao import (
     criar_despesa,
     criar_funcionario,
     criar_lembrete,
+    criar_orcamento,
     criar_produto,
     escrever_prontuario,
     estoque,
+    importar_produtos,
+    listar_orcamentos,
+    marca,
+    orcamento_xml,
     exigir_admin,
     extrair_payload_whatsapp,
     financeiro,
@@ -26,7 +32,10 @@ from .gestao import (
     movimentar_estoque,
     prontuario,
     receber_whatsapp,
+    salvar_contrato_funcionario,
     salvar_foto_produto,
+    salvar_logo,
+    salvar_marca,
     salvar_whatsapp,
     whatsapp_painel,
 )
@@ -79,6 +88,40 @@ class FuncionarioIn(BaseModel):
     login: str
     senha: str
     papel: str = "equipe"
+    cpf: str = ""
+    salario: float = 0
+    dia_vencimento: int = 5
+    contrato: str = "indefinido"
+    contrato_fim: date | None = None
+
+
+class ContratoIn(BaseModel):
+    cpf: str = ""
+    salario: float = 0
+    dia_vencimento: int = 5
+    contrato: str = "indefinido"
+    contrato_fim: date | None = None
+
+
+class MarcaIn(BaseModel):
+    nome: str
+    slogan: str = ""
+    whatsapp: str = ""
+    tolerancia_busca_min: int = 15
+    valor_atraso: float = 20
+    cor: str = "#1f6b4a"
+
+
+class ItemOrcamentoIn(BaseModel):
+    descricao: str
+    quantidade: int = 1
+    valor: float = 0
+
+
+class OrcamentoIn(BaseModel):
+    cliente: str
+    validade: date | None = None
+    itens: list[ItemOrcamentoIn]
 
 
 class WhatsappIn(BaseModel):
@@ -140,6 +183,63 @@ def novo_produto(dados: ProdutoIn, db: Session = Depends(get_db), _: Usuario = D
     return _chamar(criar_produto, db, dados.nome, dados.preco, dados.estoque, dados.minimo)
 
 
+@router.post("/estoque/importar")
+async def importar_estoque(arquivo: UploadFile = File(...), db: Session = Depends(get_db), _: Usuario = Depends(usuario_atual)):
+    conteudo = await arquivo.read()
+    return _chamar(importar_produtos, db, arquivo.filename or "lista.csv", conteudo)
+
+
+@router.get("/marca")
+def ver_marca(db: Session = Depends(get_db), _: Usuario = Depends(usuario_atual)):
+    return marca(db)
+
+
+@router.put("/marca")
+def editar_marca(dados: MarcaIn, db: Session = Depends(get_db), _: Usuario = Depends(usuario_atual)):
+    return _chamar(
+        salvar_marca,
+        db,
+        dados.nome,
+        dados.slogan,
+        dados.whatsapp,
+        dados.tolerancia_busca_min,
+        dados.valor_atraso,
+        dados.cor,
+    )
+
+
+@router.post("/marca/logo")
+async def logo_loja(arquivo: UploadFile = File(...), db: Session = Depends(get_db), _: Usuario = Depends(usuario_atual)):
+    extensao = ".png"
+    if arquivo.filename and "." in arquivo.filename:
+        candidato = "." + arquivo.filename.rsplit(".", 1)[-1].lower()
+        if candidato in {".jpg", ".jpeg", ".png", ".webp", ".svg"}:
+            extensao = ".jpg" if candidato == ".jpeg" else candidato
+    return _chamar(salvar_logo, db, await arquivo.read(), extensao)
+
+
+@router.get("/orcamentos")
+def ver_orcamentos(db: Session = Depends(get_db), _: Usuario = Depends(usuario_atual)):
+    return listar_orcamentos(db)
+
+
+@router.post("/orcamentos")
+def novo_orcamento(dados: OrcamentoIn, db: Session = Depends(get_db), _: Usuario = Depends(usuario_atual)):
+    return _chamar(
+        criar_orcamento,
+        db,
+        dados.cliente,
+        dados.validade,
+        [item.model_dump() for item in dados.itens],
+    )
+
+
+@router.get("/orcamentos/{orcamento_id}/xml")
+def xml_orcamento(orcamento_id: int, db: Session = Depends(get_db), _: Usuario = Depends(usuario_atual)):
+    xml = _chamar(orcamento_xml, db, orcamento_id)
+    return PlainTextResponse(xml, media_type="application/xml")
+
+
 @router.post("/produtos/{produto_id}/foto")
 async def foto_produto(produto_id: int, arquivo: UploadFile = File(...), db: Session = Depends(get_db), _: Usuario = Depends(usuario_atual)):
     extensao = ".jpg"
@@ -184,7 +284,33 @@ def resumo(db: Session = Depends(get_db), _: Usuario = Depends(_admin)):
 
 @router.post("/admin/funcionarios")
 def novo_funcionario(dados: FuncionarioIn, db: Session = Depends(get_db), _: Usuario = Depends(_admin)):
-    return _chamar(criar_funcionario, db, dados.nome, dados.login, dados.senha, dados.papel)
+    return _chamar(
+        criar_funcionario,
+        db,
+        dados.nome,
+        dados.login,
+        dados.senha,
+        dados.papel,
+        dados.cpf,
+        dados.salario,
+        dados.dia_vencimento,
+        dados.contrato,
+        dados.contrato_fim,
+    )
+
+
+@router.patch("/admin/funcionarios/{usuario_id}")
+def contrato_funcionario(usuario_id: int, dados: ContratoIn, db: Session = Depends(get_db), _: Usuario = Depends(_admin)):
+    return _chamar(
+        salvar_contrato_funcionario,
+        db,
+        usuario_id,
+        dados.cpf,
+        dados.salario,
+        dados.dia_vencimento,
+        dados.contrato,
+        dados.contrato_fim,
+    )
 
 
 @router.get("/whatsapp")

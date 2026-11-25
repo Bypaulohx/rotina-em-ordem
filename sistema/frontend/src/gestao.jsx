@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { diaMes, horaDe, isoDate, mascaraTelefone, moeda } from "./format.js";
+import { PALETA, aplicarCor, diaMes, documento, horaDe, isoDate, mascaraCpf, mascaraTelefone, moeda, tabelaItens } from "./format.js";
 import { ROTULOS_FORMA } from "./format.js";
 import { Bell, Calendar, Landmark, MessageCircle, NotebookPen, Package, PawPrint, ScrollText } from "lucide-react";
 import { Cabecalho, Pill, ROTULOS_PAPEL, Vazio } from "./ui.jsx";
@@ -296,12 +296,39 @@ function Estoque({ api, run }) {
   const [estoqueInicial, setEstoqueInicial] = useState("0");
   const [minimo, setMinimo] = useState("1");
   const [arquivo, setArquivo] = useState(null);
+  const [resumoImportacao, setResumoImportacao] = useState("");
   const aviso = espera(erro, dados);
   return (
     <>
       <Cabecalho kicker="Balcão" titulo="Estoque" sub="O que entra e o que sai. Quando a quantidade chega no mínimo, o boletim do dia avisa a equipe.">
-        <button className="btn" type="button" onClick={() => setAberto((atual) => !atual)}>{aberto ? "Fechar" : "Cadastrar produto"}</button>
+        <div className="acoes">
+          <label className="btn ghost">
+            Importar arquivo
+            <input type="file" accept=".csv,.txt,.pdf,.docx,text/plain,text/csv,application/pdf" hidden onChange={(evento) => {
+              const escolhido = evento.target.files?.[0];
+              evento.target.value = "";
+              if (!escolhido) return;
+              run(async () => {
+                const corpo = new FormData();
+                corpo.append("arquivo", escolhido);
+                const resposta = await fetch("/api/estoque/importar", { method: "POST", credentials: "same-origin", body: corpo });
+                const json = await resposta.json().catch(() => ({}));
+                if (!resposta.ok) {
+                  const erro = new Error(json?.detail?.mensagem || "Não foi possível ler o arquivo.");
+                  erro.status = resposta.status;
+                  throw erro;
+                }
+                const criados = json.criados?.length || 0;
+                const ignorados = json.ignorados?.length || 0;
+                setResumoImportacao(`${criados} produto(s) entrou(ram). ${ignorados} já existia(m) e ficou(ram) de fora.`);
+                await carregar();
+              });
+            }} />
+          </label>
+          <button className="btn" type="button" onClick={() => setAberto((atual) => !atual)}>{aberto ? "Fechar" : "Cadastrar produto"}</button>
+        </div>
       </Cabecalho>
+      {resumoImportacao ? <p className="muted">{resumoImportacao}</p> : null}
       {aberto ? (
         <form className="lista" onSubmit={(evento) => {
           evento.preventDefault();
@@ -420,6 +447,13 @@ function Financeiro({ api, run }) {
                   <strong>{moeda(item.valor)}</strong>
                 </div>
               )) : <Vazio icone={Landmark} titulo="Nenhuma despesa neste mês" texto="Aluguel, compra de produto e o que sair do caixa da loja podem ser lançados ao lado." />}
+              <h2>Fluxo de caixa</h2>
+              {dados.fluxo?.length ? dados.fluxo.map((linha) => (
+                <div className="item" key={linha.dia}>
+                  <div><strong>{diaMes(linha.dia)}</strong><small>Entrou {moeda(linha.entradas)} · saiu {moeda(linha.saidas)}</small></div>
+                  <strong>{moeda(linha.saldo)}</strong>
+                </div>
+              )) : <p className="muted">O mês ainda não tem venda paga nem despesa paga.</p>}
             </div>
             <form className="lista" onSubmit={(evento) => {
               evento.preventDefault();
@@ -437,9 +471,74 @@ function Financeiro({ api, run }) {
               <button className="btn" type="submit">Lançar</button>
             </form>
           </section>
+          <Fornecedores api={api} run={run} />
         </>
       )}
     </>
+  );
+}
+
+function Fornecedores({ api, run }) {
+  const { dados, erro, carregar } = useCarga(api, "/api/fornecedores");
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [email, setEmail] = useState("");
+  const aviso = espera(erro, dados);
+  return (
+    <section className="layout" style={{ marginTop: 14 }}>
+      <div className="lista">
+        <h2>Fornecedores</h2>
+        {aviso || (dados.length ? dados.map((item) => (
+          <form className="item" key={item.id} onSubmit={(evento) => {
+            evento.preventDefault();
+            const campo = new FormData(evento.target);
+            run(async () => {
+              await api(`/api/fornecedores/${item.id}`, {
+                method: "PATCH",
+                body: {
+                  cpf: String(campo.get("cpf") || ""),
+                  dia_vencimento: Number(campo.get("dia")),
+                  contrato: campo.get("contrato"),
+                  contrato_fim: campo.get("contrato") === "prazo" ? campo.get("fim") : null,
+                },
+              });
+              await carregar();
+            });
+          }}>
+            <div>
+              <strong>{item.nome}</strong>
+              <small>{item.email || "Sem e-mail"}</small>
+            </div>
+            <label className="field"><span>CPF</span><input name="cpf" defaultValue={mascaraCpf(item.cpf)} /></label>
+            <label className="field"><span>Vencimento</span><input name="dia" type="number" min="1" max="28" defaultValue={item.dia_vencimento} /></label>
+            <label className="field"><span>Contrato</span>
+              <select name="contrato" defaultValue={item.contrato}>
+                <option value="indefinido">Indefinido</option>
+                <option value="prazo">Com prazo</option>
+              </select>
+            </label>
+            <label className="field"><span>Fim</span><input name="fim" type="date" defaultValue={item.contrato_fim || ""} /></label>
+            <button className="btn pequeno" type="submit">Salvar</button>
+          </form>
+        )) : <p className="muted">Nenhum fornecedor cadastrado.</p>)}
+      </div>
+      <form className="lista" onSubmit={(evento) => {
+        evento.preventDefault();
+        run(async () => {
+          await api("/api/fornecedores", { method: "POST", body: { nome, telefone, email } });
+          setNome("");
+          setTelefone("");
+          setEmail("");
+          await carregar();
+        });
+      }}>
+        <h2>Novo fornecedor</h2>
+        <label className="field"><span>Nome</span><input required value={nome} onChange={(evento) => setNome(evento.target.value)} /></label>
+        <label className="field"><span>Telefone</span><input value={telefone} onChange={(evento) => setTelefone(mascaraTelefone(evento.target.value))} /></label>
+        <label className="field"><span>E-mail</span><input value={email} onChange={(evento) => setEmail(evento.target.value)} /></label>
+        <button className="btn" type="submit">Cadastrar</button>
+      </form>
+    </section>
   );
 }
 
@@ -497,6 +596,11 @@ function Admin({ api, run }) {
   const [login, setLogin] = useState("");
   const [senha, setSenha] = useState("");
   const [papel, setPapel] = useState("recepcao");
+  const [cpf, setCpf] = useState("");
+  const [salario, setSalario] = useState("0");
+  const [dia, setDia] = useState("5");
+  const [contrato, setContrato] = useState("indefinido");
+  const [fim, setFim] = useState("");
   const [filtro, setFiltro] = useState("");
   const aviso = espera(erro, dados);
   const atividades = (dados?.atividades || []).filter((item) => !filtro || String(item.usuario_id || "") === filtro);
@@ -531,10 +635,14 @@ function Admin({ api, run }) {
               <form className="lista" onSubmit={(evento) => {
                 evento.preventDefault();
                 run(async () => {
-                  await api("/api/admin/funcionarios", { method: "POST", body: { nome, login, senha, papel } });
+                  await api("/api/admin/funcionarios", {
+                    method: "POST",
+                    body: { nome, login, senha, papel, cpf, salario: Number(salario), dia_vencimento: Number(dia), contrato, contrato_fim: contrato === "prazo" ? fim : null },
+                  });
                   setNome("");
                   setLogin("");
                   setSenha("");
+                  setCpf("");
                   await carregar();
                 });
               }}>
@@ -553,8 +661,53 @@ function Admin({ api, run }) {
                     <option value="admin">Dono</option>
                   </select>
                 </label>
+                <label className="field"><span>CPF</span><input value={cpf} onChange={(evento) => setCpf(mascaraCpf(evento.target.value))} /></label>
+                <label className="field"><span>Salário</span><input type="number" min="0" step="0.01" value={salario} onChange={(evento) => setSalario(evento.target.value)} /></label>
+                <label className="field"><span>Dia do vencimento</span><input type="number" min="1" max="28" value={dia} onChange={(evento) => setDia(evento.target.value)} /></label>
+                <label className="field"><span>Contrato</span>
+                  <select value={contrato} onChange={(evento) => setContrato(evento.target.value)}>
+                    <option value="indefinido">Indefinido</option>
+                    <option value="prazo">Com prazo</option>
+                  </select>
+                </label>
+                {contrato === "prazo" ? <label className="field"><span>Fim do contrato</span><input type="date" required value={fim} onChange={(evento) => setFim(evento.target.value)} /></label> : null}
                 <button className="btn" type="submit">Cadastrar</button>
               </form>
+              <div className="lista" style={{ marginTop: 14 }}>
+                <h2>Contratos da equipe</h2>
+                {dados.funcionarios.map((pessoa) => (
+                  <form className="item" key={pessoa.id} onSubmit={(evento) => {
+                    evento.preventDefault();
+                    const campo = new FormData(evento.target);
+                    run(async () => {
+                      await api(`/api/admin/funcionarios/${pessoa.id}`, {
+                        method: "PATCH",
+                        body: {
+                          cpf: String(campo.get("cpf") || ""),
+                          salario: Number(campo.get("salario")),
+                          dia_vencimento: Number(campo.get("dia")),
+                          contrato: campo.get("contrato"),
+                          contrato_fim: campo.get("contrato") === "prazo" ? campo.get("fim") : null,
+                        },
+                      });
+                      await carregar();
+                    });
+                  }}>
+                    <div><strong>{pessoa.nome}</strong><small>{pessoa.papel}</small></div>
+                    <label className="field"><span>CPF</span><input name="cpf" defaultValue={mascaraCpf(pessoa.cpf)} /></label>
+                    <label className="field"><span>Salário</span><input name="salario" type="number" min="0" step="0.01" defaultValue={pessoa.salario} /></label>
+                    <label className="field"><span>Vencimento</span><input name="dia" type="number" min="1" max="28" defaultValue={pessoa.dia_vencimento} /></label>
+                    <label className="field"><span>Contrato</span>
+                      <select name="contrato" defaultValue={pessoa.contrato}>
+                        <option value="indefinido">Indefinido</option>
+                        <option value="prazo">Com prazo</option>
+                      </select>
+                    </label>
+                    <label className="field"><span>Fim</span><input name="fim" type="date" defaultValue={pessoa.contrato_fim || ""} /></label>
+                    <button className="btn pequeno" type="submit">Salvar</button>
+                  </form>
+                ))}
+              </div>
               <div className="lista" style={{ marginTop: 14 }}>
                 <h2>Na baia neste mês</h2>
                 {dados.por_profissional.map((pessoa) => (
@@ -658,6 +811,125 @@ function Ponto({ api }) {
   );
 }
 
+function Marca({ api, run, onMarca }) {
+  const { dados, erro, setDados } = useCarga(api, "/api/marca");
+  const [nome, setNome] = useState("");
+  const [slogan, setSlogan] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [tolerancia, setTolerancia] = useState("15");
+  const [taxa, setTaxa] = useState("20");
+  const [cor, setCor] = useState("#1f6b4a");
+  const aviso = espera(erro, dados);
+  useEffect(() => {
+    if (!dados) return;
+    setNome(dados.nome || "");
+    setSlogan(dados.slogan || "");
+    setWhatsapp(mascaraTelefone(dados.whatsapp || ""));
+    setTolerancia(String(dados.tolerancia_busca_min ?? 15));
+    setTaxa(String(dados.valor_atraso ?? 20));
+    setCor(dados.cor || "#1f6b4a");
+  }, [dados]);
+  return (
+    <>
+      <Cabecalho kicker="Identidade" titulo="Marca" />
+      {aviso || (
+        <form className="lista" onSubmit={(evento) => {
+          evento.preventDefault();
+          run(async () => {
+            const salvo = await api("/api/marca", {
+              method: "PUT",
+              body: { nome, slogan, whatsapp, tolerancia_busca_min: Number(tolerancia), valor_atraso: Number(taxa), cor },
+            });
+            setDados(salvo);
+            aplicarCor(salvo.cor);
+            onMarca?.(salvo);
+          });
+        }}>
+          {dados.logo ? <img className="foto-estoque" src={dados.logo} alt="" /> : null}
+          <label className="field"><span>Nome da empresa</span><input required value={nome} onChange={(evento) => setNome(evento.target.value)} /></label>
+          <label className="field"><span>Frase da loja</span><input value={slogan} onChange={(evento) => setSlogan(evento.target.value)} maxLength={120} /></label>
+          <label className="field"><span>WhatsApp</span><input value={whatsapp} onChange={(evento) => setWhatsapp(mascaraTelefone(evento.target.value))} /></label>
+          <label className="field"><span>Tolerância da busca (minutos)</span><input type="number" min="0" max="240" value={tolerancia} onChange={(evento) => setTolerancia(evento.target.value)} /></label>
+          <label className="field"><span>Taxa de atraso</span><input type="number" min="0" step="0.01" value={taxa} onChange={(evento) => setTaxa(evento.target.value)} /></label>
+          <div className="field"><span>Cor da marca</span><div className="paleta">{PALETA.map(([valor, rotulo]) => <button key={valor} type="button" className={cor === valor ? "ativa" : ""} style={{ background: valor }} aria-label={rotulo} onClick={() => setCor(valor)} />)}</div></div>
+          <label className="field"><span>Logo</span><input type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" onChange={(evento) => {
+            const escolhido = evento.target.files?.[0];
+            evento.target.value = "";
+            if (!escolhido) return;
+            run(async () => {
+              const corpo = new FormData();
+              corpo.append("arquivo", escolhido);
+              const resposta = await fetch("/api/marca/logo", { method: "POST", credentials: "same-origin", body: corpo });
+              const json = await resposta.json().catch(() => ({}));
+              if (!resposta.ok) throw new Error(json?.detail?.mensagem || "Não foi possível guardar a logo.");
+              setDados(json);
+              onMarca?.(json);
+            });
+          }} /></label>
+          <button className="btn" type="submit">Salvar marca</button>
+        </form>
+      )}
+    </>
+  );
+}
+
+function Orcamentos({ api, run }) {
+  const { dados, erro, carregar } = useCarga(api, "/api/orcamentos");
+  const [cliente, setCliente] = useState("");
+  const [validade, setValidade] = useState("");
+  const [itens, setItens] = useState([{ descricao: "", quantidade: 1, valor: "" }]);
+  const aviso = espera(erro, dados);
+  return (
+    <>
+      <Cabecalho kicker="Antes da venda" titulo="Orçamentos" />
+      {aviso || (
+        <section className="layout">
+          <div className="lista">
+            {dados.length ? dados.map((item) => (
+              <div className="item" key={item.id}>
+                <div><strong>#{item.numero} — {item.cliente}</strong><small>{moeda(item.total)} · {item.validade || "sem validade"}</small></div>
+                <div className="acoes">
+                  <button className="btn pequeno ghost" type="button" onClick={() => documento(`Orçamento ${item.numero}`, `<p>${item.cliente}</p>${tabelaItens(item.itens, item.total)}`, "Orçamento. Não baixa estoque e não recebe pagamento.")}>PDF</button>
+                  <a className="btn pequeno ghost" href={`/api/orcamentos/${item.id}/xml`}>XML</a>
+                </div>
+              </div>
+            )) : <p className="muted">Nenhum orçamento ainda.</p>}
+          </div>
+          <form className="lista" onSubmit={(evento) => {
+            evento.preventDefault();
+            run(async () => {
+              await api("/api/orcamentos", {
+                method: "POST",
+                body: {
+                  cliente,
+                  validade: validade || null,
+                  itens: itens.filter((item) => item.descricao.trim()).map((item) => ({ descricao: item.descricao, quantidade: Number(item.quantidade), valor: Number(item.valor) })),
+                },
+              });
+              setCliente("");
+              setItens([{ descricao: "", quantidade: 1, valor: "" }]);
+              await carregar();
+            });
+          }}>
+            <h2>Novo orçamento</h2>
+            <label className="field"><span>Cliente</span><input required value={cliente} onChange={(evento) => setCliente(evento.target.value)} /></label>
+            <label className="field"><span>Validade</span><input type="date" value={validade} onChange={(evento) => setValidade(evento.target.value)} /></label>
+            {itens.map((item, indice) => (
+              <div className="form-grid" key={indice}>
+                <label className="field"><span>Item</span><input value={item.descricao} onChange={(evento) => setItens((atual) => atual.map((linha, i) => i === indice ? { ...linha, descricao: evento.target.value } : linha))} /></label>
+                <label className="field"><span>Qtd</span><input type="number" min="1" value={item.quantidade} onChange={(evento) => setItens((atual) => atual.map((linha, i) => i === indice ? { ...linha, quantidade: evento.target.value } : linha))} /></label>
+                <label className="field"><span>Valor</span><input type="number" min="0" step="0.01" value={item.valor} onChange={(evento) => setItens((atual) => atual.map((linha, i) => i === indice ? { ...linha, valor: evento.target.value } : linha))} /></label>
+              </div>
+            ))}
+            <button className="btn pequeno ghost" type="button" onClick={() => setItens((atual) => [...atual, { descricao: "", quantidade: 1, valor: "" }])}>Mais um item</button>
+            <button className="btn" type="submit">Salvar orçamento</button>
+          </form>
+        </section>
+      )}
+    </>
+  );
+}
+
 const TELAS = {
   boletins: Boletins,
   prontuario: Prontuario,
@@ -665,6 +937,8 @@ const TELAS = {
   catalogo: Catalogo,
   estoque: Estoque,
   financeiro: Financeiro,
+  orcamentos: Orcamentos,
+  marca: Marca,
   whatsapp: Whatsapp,
   indicadores: Indicadores,
   ponto: Ponto,
@@ -675,8 +949,8 @@ export function eGestao(page) {
   return Object.prototype.hasOwnProperty.call(TELAS, page);
 }
 
-export default function Gestao({ page, api, run, me, pessoas }) {
+export default function Gestao({ page, api, run, me, pessoas, onMarca }) {
   const Tela = TELAS[page];
   if (!Tela) return null;
-  return <Tela api={api} run={run} me={me} pessoas={pessoas} />;
+  return <Tela api={api} run={run} me={me} pessoas={pessoas} onMarca={onMarca} />;
 }

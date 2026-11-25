@@ -32,6 +32,7 @@ class CadastroIn(BaseModel):
     responsavel: str
     login: str
     senha: str
+    cor: str = "#1f6b4a"
 
 
 class SalaoIn(BaseModel):
@@ -160,6 +161,8 @@ def _sessao(usuario: Usuario, response: Response, db: Session) -> dict:
         "papel": usuario.papel or "admin",
         "loja": loja.nome if loja and loja.nome else "",
         "slogan": loja.slogan if loja and loja.slogan else "",
+        "logo": loja.logo if loja and loja.logo else "",
+        "cor": loja.cor if loja and loja.cor else "#1f6b4a",
     }
 
 
@@ -185,6 +188,7 @@ def cadastro(dados: CadastroIn, response: Response, db: Session = Depends(get_db
         dados.responsavel,
         dados.login,
         dados.senha,
+        dados.cor,
     )
     return _sessao(usuario, response, db)
 
@@ -220,6 +224,8 @@ def me(db: Session = Depends(get_db), usuario: Usuario = Depends(usuario_atual))
         "papel": usuario.papel or "admin",
         "loja": loja.nome if loja and loja.nome else "",
         "slogan": loja.slogan if loja and loja.slogan else "",
+        "logo": loja.logo if loja and loja.logo else "",
+        "cor": loja.cor if loja and loja.cor else "#1f6b4a",
     }
 
 

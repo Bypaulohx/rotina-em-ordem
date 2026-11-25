@@ -165,6 +165,41 @@ export function mascaraCpf(valor) {
     .replace(/\.(\d{3})(\d)/, ".$1-$2");
 }
 
+export const PALETA = [
+  ["#1f6b4a", "Verde"],
+  ["#1b4f6b", "Azul"],
+  ["#6b3d45", "Vinho"],
+  ["#6b4a1f", "Areia"],
+];
+
+export function aplicarCor(cor) {
+  const accent = /^#[0-9a-fA-F]{6}$/.test(cor || "") ? cor : "#1f6b4a";
+  const n = Number.parseInt(accent.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const hex = (rv, gv, bv) => `#${[rv, gv, bv].map((valor) => Math.max(0, Math.min(255, valor)).toString(16).padStart(2, "0")).join("")}`;
+  const raiz = document.documentElement.style;
+  raiz.setProperty("--accent", accent);
+  raiz.setProperty("--accent-2", hex(Math.round(r * 0.72), Math.round(g * 0.72), Math.round(b * 0.72)));
+  raiz.setProperty("--accent-soft", hex(Math.round(r * 0.12 + 231), Math.round(g * 0.12 + 242), Math.round(b * 0.12 + 236)));
+  raiz.setProperty("--accent-line", hex(Math.round(r * 0.45 + 140), Math.round(g * 0.45 + 170), Math.round(b * 0.45 + 160)));
+}
+
+export function documento(titulo, corpo, aviso) {
+  const janela = window.open("", "_blank", "noopener,width=760,height=900");
+  if (!janela) return;
+  janela.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${titulo}</title><style>body{font-family:"IBM Plex Sans",sans-serif;color:#1b2420;margin:32px}h1{font-size:22px;font-weight:600}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #d9ddd8;text-align:left;padding:8px 0;font-weight:500}.aviso{color:#5c675f;font-size:12px}</style></head><body><h1>${titulo}</h1>${corpo}<p class="aviso">${aviso || ""}</p></body></html>`);
+  janela.document.close();
+  janela.focus();
+  janela.print();
+}
+
+export function tabelaItens(itens, total) {
+  const linhas = itens.map((item) => `<tr><td>${item.descricao}</td><td>${item.quantidade || 1}</td><td>${moeda(item.valor)}</td></tr>`).join("");
+  return `<table><thead><tr><th>Item</th><th>Qtd</th><th>Valor</th></tr></thead><tbody>${linhas}</tbody></table><p><strong>Total ${moeda(total)}</strong></p>`;
+}
+
 export function cobreHotel(item, iso) {
   if ((item.diarias || []).length) return item.diarias.some((linha) => linha.data === iso);
   const fim = item.checkout_real || item.checkout_previsto;

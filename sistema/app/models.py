@@ -18,6 +18,11 @@ class Usuario(Base):
     papel: Mapped[str] = mapped_column(String(20), default="equipe")
     matricula: Mapped[str] = mapped_column(String(20), default="")
     pis: Mapped[str] = mapped_column(String(12), default="")
+    cpf: Mapped[str] = mapped_column(String(11), default="")
+    salario: Mapped[float] = mapped_column(Float, default=0)
+    dia_vencimento: Mapped[int] = mapped_column(Integer, default=5)
+    contrato: Mapped[str] = mapped_column(String(20), default="indefinido")
+    contrato_fim: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 
 class Sessao(Base):
@@ -46,6 +51,8 @@ class ConfigLoja(Base):
     whatsapp_token: Mapped[str] = mapped_column(String(64), default="")
     nome: Mapped[str] = mapped_column(String(80), default="")
     slogan: Mapped[str] = mapped_column(String(120), default="")
+    logo: Mapped[str] = mapped_column(String(200), default="")
+    cor: Mapped[str] = mapped_column(String(7), default="#1f6b4a")
 
 
 class Cliente(Base):
@@ -359,6 +366,34 @@ class Fornecedor(Base):
     nome: Mapped[str] = mapped_column(String(120))
     telefone: Mapped[str] = mapped_column(String(20), default="")
     email: Mapped[str] = mapped_column(String(120), default="")
+    cpf: Mapped[str] = mapped_column(String(11), default="")
+    dia_vencimento: Mapped[int] = mapped_column(Integer, default=5)
+    contrato: Mapped[str] = mapped_column(String(20), default="indefinido")
+    contrato_fim: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+class Orcamento(Base):
+    __tablename__ = "orcamentos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    numero: Mapped[int] = mapped_column(Integer)
+    cliente_nome: Mapped[str] = mapped_column(String(120))
+    validade: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="aberto")
+    total: Mapped[float] = mapped_column(Float, default=0)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    itens: Mapped[list["ItemOrcamento"]] = relationship(back_populates="orcamento")
+
+
+class ItemOrcamento(Base):
+    __tablename__ = "itens_orcamento"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    orcamento_id: Mapped[int] = mapped_column(ForeignKey("orcamentos.id"))
+    descricao: Mapped[str] = mapped_column(String(180))
+    quantidade: Mapped[int] = mapped_column(Integer, default=1)
+    valor: Mapped[float] = mapped_column(Float)
+    orcamento: Mapped[Orcamento] = relationship(back_populates="itens")
 
 
 class PacoteContratado(Base):

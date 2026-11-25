@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-RECEPCAO = {"painel", "mapa", "agenda", "vendas", "pets", "caixas", "whatsapp"}
+RECEPCAO = {"painel", "mapa", "agenda", "vendas", "pets", "caixas", "whatsapp", "orcamentos"}
 TOSADOR = {"painel", "mapa", "agenda", "pets", "boletins", "lembretes"}
 VETERINARIO = {"agenda", "pets", "boletins", "prontuario", "lembretes"}
 ESTOQUISTA = {"vendas", "pets", "catalogo", "estoque"}
@@ -18,6 +18,7 @@ GERENTE = {
     "indicadores",
     "whatsapp",
     "ponto",
+    "orcamentos",
 }
 
 PAPEIS = {
@@ -42,6 +43,8 @@ ROTULOS = {
 
 PREFIXOS = (
     ("/api/admin", "admin"),
+    ("/api/marca", "admin"),
+    ("/api/orcamentos", "vendas"),
     ("/api/ponto", "ponto"),
     ("/api/indicadores", "indicadores"),
     ("/api/financeiro", "financeiro"),

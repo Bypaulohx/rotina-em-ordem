@@ -625,6 +625,38 @@ def indicadores(db: Session, inicio: date, fim: date) -> dict:
     }
 
 
+def _fornecedor_dict(row: Fornecedor) -> dict:
+    return {
+        "id": row.id,
+        "nome": row.nome,
+        "telefone": row.telefone,
+        "email": row.email,
+        "cpf": row.cpf or "",
+        "dia_vencimento": row.dia_vencimento or 5,
+        "contrato": row.contrato or "indefinido",
+        "contrato_fim": row.contrato_fim.isoformat() if row.contrato_fim else "",
+    }
+
+
+def listar_fornecedores(db: Session) -> list[dict]:
+    return [_fornecedor_dict(item) for item in db.query(Fornecedor).order_by(Fornecedor.nome)]
+
+
+def atualizar_fornecedor(db: Session, fornecedor_id: int, cpf: str, dia: int, tipo: str, fim: date | None) -> dict:
+    from .gestao import _contrato
+
+    row = db.get(Fornecedor, fornecedor_id)
+    if row is None:
+        raise RegraNegocio("Fornecedor não encontrado.", 404)
+    numero, _, vencimento, contrato, termino = _contrato(cpf, 0, dia, tipo, fim)
+    row.cpf = numero
+    row.dia_vencimento = vencimento
+    row.contrato = contrato
+    row.contrato_fim = termino
+    db.commit()
+    return _fornecedor_dict(row)
+
+
 def criar_fornecedor(db: Session, nome: str, telefone: str, email: str) -> dict:
     limpo = nome.strip()
     if not limpo:

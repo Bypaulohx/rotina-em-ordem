@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import html
 import re
 import secrets
+import zipfile
 from datetime import date, datetime, timedelta
+from io import BytesIO
 from pathlib import Path
+from xml.etree import ElementTree
 
 from sqlalchemy.orm import Session
 
@@ -13,7 +17,9 @@ from .models import (
     Cliente,
     Despesa,
     Hospedagem,
+    ItemOrcamento,
     Lembrete,
+    Orcamento,
     MensagemWhatsapp,
     MovimentoEstoque,
     NotaProntuario,
@@ -26,6 +32,7 @@ from .models import (
 )
 from .rules import RegraNegocio
 from .security import hash_senha
+from .validacao import cpf_valido, digitos
 from . import services
 
 UPLOADS = Path(__file__).resolve().parent.parent / "uploads"
@@ -250,6 +257,246 @@ def salvar_foto_produto(db: Session, produto_id: int, conteudo: bytes, extensao:
     return {"id": produto.id, "foto": produto.foto}
 
 
+def _cor(valor: str) -> str:
+    cor = (valor or "").strip()
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", cor):
+        raise RegraNegocio("Escolha uma cor no formato #1f6b4a.", 400)
+    return cor.lower()
+
+
+def _contrato(cpf: str, salario: float, dia: int, tipo: str, fim: date | None):
+    numero = digitos(cpf)
+    if numero and not cpf_valido(numero):
+        raise RegraNegocio("O CPF não confere.", 400)
+    if salario < 0:
+        raise RegraNegocio("O salário não pode ser negativo.", 400)
+    if dia < 1 or dia > 28:
+        raise RegraNegocio("O vencimento fica entre o dia 1 e o dia 28.", 400)
+    if tipo not in {"indefinido", "prazo"}:
+        raise RegraNegocio("O contrato é por prazo ou por tempo indefinido.", 400)
+    if tipo == "prazo" and fim is None:
+        raise RegraNegocio("Informe o fim do contrato.", 400)
+    return numero, round(float(salario), 2), dia, tipo, None if tipo == "indefinido" else fim
+
+
+def marca(db: Session) -> dict:
+    cfg = services.config_loja(db)
+    return {
+        "nome": cfg.nome or "",
+        "slogan": cfg.slogan or "",
+        "whatsapp": cfg.whatsapp or "",
+        "tolerancia_busca_min": cfg.tolerancia_busca_min,
+        "valor_atraso": cfg.valor_atraso,
+        "logo": cfg.logo or "",
+        "cor": cfg.cor or "#1f6b4a",
+    }
+
+
+def salvar_marca(db: Session, nome: str, slogan: str, whatsapp: str, tolerancia: int, valor_atraso: float, cor: str) -> dict:
+    loja = nome.strip()
+    frase = slogan.strip()
+    telefone = digitos(whatsapp)
+    if not loja or len(loja) > 80 or len(frase) > 120:
+        raise RegraNegocio("Informe o nome da empresa, com até 80 caracteres.", 400)
+    if telefone and not 10 <= len(telefone) <= 13:
+        raise RegraNegocio("Informe o WhatsApp com DDD.", 400)
+    if tolerancia < 0 or tolerancia > 240 or valor_atraso < 0:
+        raise RegraNegocio("Revise a tolerância da busca e a taxa de atraso.", 400)
+    cfg = services.config_loja(db)
+    cfg.nome = loja
+    cfg.slogan = frase
+    cfg.whatsapp = telefone
+    cfg.tolerancia_busca_min = tolerancia
+    cfg.valor_atraso = round(float(valor_atraso), 2)
+    cfg.cor = _cor(cor)
+    if telefone and not cfg.whatsapp_token:
+        cfg.whatsapp_token = secrets.token_urlsafe(18)
+    if not telefone:
+        cfg.whatsapp_token = ""
+    db.commit()
+    return marca(db)
+
+
+def salvar_logo(db: Session, conteudo: bytes, extensao: str) -> dict:
+    if not conteudo:
+        raise RegraNegocio("A logo veio vazia.", 400)
+    if len(conteudo) > 2_000_000:
+        raise RegraNegocio("A logo precisa ter até 2 MB.", 400)
+    cfg = services.config_loja(db)
+    UPLOADS.mkdir(exist_ok=True)
+    anterior = cfg.logo or ""
+    nome = f"loja-{secrets.token_hex(4)}{extensao}"
+    (UPLOADS / nome).write_bytes(conteudo)
+    cfg.logo = f"/uploads/{nome}"
+    db.commit()
+    if anterior.startswith("/uploads/loja-"):
+        velho = UPLOADS / Path(anterior).name
+        if velho.is_file() and velho.name != nome:
+            velho.unlink()
+    return marca(db)
+
+
+def _numero(texto: str) -> float:
+    limpo = (texto or "").strip().replace("R$", "").replace(" ", "")
+    if limpo.count(",") == 1 and limpo.count(".") == 0:
+        limpo = limpo.replace(",", ".")
+    elif limpo.count(".") > 1:
+        limpo = limpo.replace(".", "").replace(",", ".")
+    elif "," in limpo and "." in limpo:
+        limpo = limpo.replace(".", "").replace(",", ".")
+    try:
+        return float(limpo)
+    except ValueError:
+        return -1
+
+
+def _texto_arquivo(nome: str, conteudo: bytes) -> str:
+    extensao = nome.rsplit(".", 1)[-1].lower() if "." in nome else ""
+    if extensao == "docx":
+        try:
+            with zipfile.ZipFile(BytesIO(conteudo)) as pacote:
+                xml = pacote.read("word/document.xml")
+        except (zipfile.BadZipFile, KeyError) as erro:
+            raise RegraNegocio("Não consegui ler esse DOCX.", 400) from erro
+        raiz = ElementTree.fromstring(xml)
+        ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+        linhas = []
+        for paragrafo in raiz.iter(f"{ns}p"):
+            textos = [no.text or "" for no in paragrafo.iter(f"{ns}t")]
+            if any(textos):
+                linhas.append("".join(textos))
+        return "\n".join(linhas)
+    if extensao == "pdf":
+        bruto = conteudo.decode("latin1", errors="ignore")
+        pedacos = re.findall(r"\((?:\\.|[^\\)]){1,180}\)", bruto)
+        linhas = []
+        for pedaco in pedacos:
+            texto = pedaco[1:-1].replace(r"\(", "(").replace(r"\)", ")").replace(r"\n", " ")
+            if any(letra.isalpha() for letra in texto):
+                linhas.append(texto)
+        return "\n".join(linhas)
+    if extensao not in {"csv", "txt", "text"}:
+        raise RegraNegocio("Envie um arquivo CSV, TXT, DOCX ou PDF.", 400)
+    return conteudo.decode("utf-8-sig", errors="ignore")
+
+
+def _linhas_produto(texto: str) -> list[dict]:
+    saida = []
+    for bruta in texto.splitlines():
+        linha = bruta.strip().strip('"')
+        if not linha or linha.lower().startswith("nome"):
+            continue
+        if re.search(r"[;\t|]", linha):
+            partes = [parte.strip() for parte in re.split(r"[;\t|]", linha)]
+        elif linha.count(",") >= 2:
+            partes = [parte.strip() for parte in linha.split(",")]
+        else:
+            achado = re.match(r"(.+?)\s+(\d+[.,]\d{2})(?:\s+(\d+))?(?:\s+(\d+))?$", linha)
+            partes = [achado.group(1), achado.group(2), achado.group(3) or "0", achado.group(4) or "1"] if achado else []
+        if len(partes) < 2:
+            continue
+        preco = _numero(partes[1])
+        estoque = int(_numero(partes[2])) if len(partes) > 2 and _numero(partes[2]) >= 0 else 0
+        minimo = int(_numero(partes[3])) if len(partes) > 3 and _numero(partes[3]) >= 0 else 1
+        nome = partes[0].strip()
+        if nome and preco >= 0:
+            saida.append({"nome": nome[:120], "preco": round(preco, 2), "estoque": estoque, "minimo": minimo})
+        if len(saida) >= 200:
+            break
+    return saida
+
+
+def importar_produtos(db: Session, nome_arquivo: str, conteudo: bytes) -> dict:
+    if not conteudo:
+        raise RegraNegocio("O arquivo veio vazio.", 400)
+    if len(conteudo) > 2_000_000:
+        raise RegraNegocio("O arquivo precisa ter até 2 MB.", 400)
+    texto = _texto_arquivo(nome_arquivo or "lista.csv", conteudo)
+    if not texto.strip():
+        raise RegraNegocio("Não encontrei texto neste arquivo. Um PDF só de imagem não entra. Use CSV, TXT ou DOCX.", 400)
+    linhas = _linhas_produto(texto)
+    if not linhas:
+        raise RegraNegocio("Nenhuma linha parecia um produto. Separe nome, preço e estoque por vírgula ou ponto e vírgula.", 400)
+    criados = []
+    ignorados = []
+    for item in linhas:
+        existe = db.query(Produto).filter(Produto.ativo.is_(True), Produto.nome.ilike(item["nome"])).first()
+        if existe:
+            ignorados.append(item["nome"])
+            continue
+        criar_produto(db, item["nome"], item["preco"], item["estoque"], item["minimo"])
+        criados.append(item["nome"])
+    return {"criados": criados, "ignorados": ignorados}
+
+
+def _orcamento_dict(orcamento: Orcamento) -> dict:
+    return {
+        "id": orcamento.id,
+        "numero": f"{orcamento.numero:05d}",
+        "cliente": orcamento.cliente_nome,
+        "validade": orcamento.validade.isoformat() if orcamento.validade else "",
+        "status": orcamento.status,
+        "total": round(orcamento.total, 2),
+        "criado_em": _iso(orcamento.criado_em),
+        "itens": [
+            {"descricao": item.descricao, "quantidade": item.quantidade, "valor": round(item.valor, 2)}
+            for item in orcamento.itens
+        ],
+    }
+
+
+def listar_orcamentos(db: Session) -> list[dict]:
+    itens = db.query(Orcamento).order_by(Orcamento.criado_em.desc()).limit(40).all()
+    return [_orcamento_dict(item) for item in itens]
+
+
+def criar_orcamento(db: Session, cliente: str, validade: date | None, itens: list[dict]) -> dict:
+    nome = cliente.strip()
+    if not nome:
+        raise RegraNegocio("Informe o cliente do orçamento.", 400)
+    preparados = []
+    for item in itens:
+        descricao = str(item.get("descricao", "")).strip()
+        quantidade = int(item.get("quantidade") or 0)
+        valor = float(item.get("valor") or 0)
+        if descricao and quantidade > 0 and valor >= 0:
+            preparados.append((descricao[:180], quantidade, round(valor, 2)))
+    if not preparados:
+        raise RegraNegocio("Inclua ao menos um item com quantidade.", 400)
+    ultimo = db.query(Orcamento).order_by(Orcamento.numero.desc()).first()
+    orcamento = Orcamento(
+        numero=(ultimo.numero + 1) if ultimo else 1,
+        cliente_nome=nome[:120],
+        validade=validade,
+        status="aberto",
+        total=round(sum(quantidade * valor for _, quantidade, valor in preparados), 2),
+    )
+    db.add(orcamento)
+    db.flush()
+    for descricao, quantidade, valor in preparados:
+        db.add(ItemOrcamento(orcamento_id=orcamento.id, descricao=descricao, quantidade=quantidade, valor=valor))
+    db.commit()
+    db.refresh(orcamento)
+    return _orcamento_dict(orcamento)
+
+
+def orcamento_xml(db: Session, orcamento_id: int) -> str:
+    orcamento = db.get(Orcamento, orcamento_id)
+    if orcamento is None:
+        raise RegraNegocio("Orçamento não encontrado.", 404)
+    corpo = _orcamento_dict(orcamento)
+    itens = "".join(
+        f"<item><descricao>{html.escape(item['descricao'])}</descricao><quantidade>{item['quantidade']}</quantidade><valor>{item['valor']:.2f}</valor></item>"
+        for item in corpo["itens"]
+    )
+    return (
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        f"<orcamento><numero>{corpo['numero']}</numero><cliente>{html.escape(corpo['cliente'])}</cliente>"
+        f"<validade>{corpo['validade']}</validade><status>{corpo['status']}</status><total>{corpo['total']:.2f}</total>"
+        f"<itens>{itens}</itens></orcamento>"
+    )
+
+
 def estoque(db: Session) -> list[dict]:
     saida = []
     for produto in db.query(Produto).filter(Produto.ativo.is_(True)).order_by(Produto.nome):
@@ -332,7 +579,35 @@ def financeiro(db: Session, ano: int, mes: int) -> dict:
         "por_forma": por_forma,
         "despesas": despesas,
         "dinheiro": round(por_forma.get("dinheiro", 0), 2),
+        "fluxo": _fluxo(vendas, despesas),
     }
+
+
+def _fluxo(vendas: list[Venda], despesas: list[dict]) -> list[dict]:
+    dias: dict[str, dict] = {}
+    for venda in vendas:
+        if venda.status != "paga":
+            continue
+        chave = venda.criada_em.date().isoformat()
+        dias.setdefault(chave, {"dia": chave, "entradas": 0.0, "saidas": 0.0})
+        dias[chave]["entradas"] += venda.total
+    for item in despesas:
+        dias.setdefault(item["data"], {"dia": item["data"], "entradas": 0.0, "saidas": 0.0})
+        dias[item["data"]]["saidas"] += item["valor"]
+    saldo = 0.0
+    linhas = []
+    for chave in sorted(dias):
+        linha = dias[chave]
+        saldo += linha["entradas"] - linha["saidas"]
+        linhas.append(
+            {
+                "dia": chave,
+                "entradas": round(linha["entradas"], 2),
+                "saidas": round(linha["saidas"], 2),
+                "saldo": round(saldo, 2),
+            }
+        )
+    return linhas
 
 
 def criar_despesa(db: Session, descricao: str, valor: float, quando: date, categoria: str) -> dict:
@@ -348,7 +623,17 @@ def admin_resumo(db: Session) -> dict:
     agora = datetime.now()
     inicio_mes = agora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     funcionarios = [
-        {"id": usuario.id, "nome": usuario.nome, "login": usuario.login, "papel": papel_de(usuario)}
+        {
+            "id": usuario.id,
+            "nome": usuario.nome,
+            "login": usuario.login,
+            "papel": papel_de(usuario),
+            "cpf": usuario.cpf or "",
+            "salario": round(usuario.salario or 0, 2),
+            "dia_vencimento": usuario.dia_vencimento or 5,
+            "contrato": usuario.contrato or "indefinido",
+            "contrato_fim": usuario.contrato_fim.isoformat() if usuario.contrato_fim else "",
+        }
         for usuario in db.query(Usuario).order_by(Usuario.nome)
     ]
     atividades = []
@@ -387,7 +672,32 @@ def admin_resumo(db: Session) -> dict:
     }
 
 
-def criar_funcionario(db: Session, nome: str, login: str, senha: str, papel: str) -> dict:
+def salvar_contrato_funcionario(db: Session, usuario_id: int, cpf: str, salario: float, dia: int, tipo: str, fim: date | None) -> dict:
+    usuario = db.get(Usuario, usuario_id)
+    if usuario is None:
+        raise RegraNegocio("Funcionário não encontrado.", 404)
+    numero, valor, vencimento, contrato, termino = _contrato(cpf, salario, dia, tipo, fim)
+    usuario.cpf = numero
+    usuario.salario = valor
+    usuario.dia_vencimento = vencimento
+    usuario.contrato = contrato
+    usuario.contrato_fim = termino
+    db.commit()
+    return admin_resumo(db)
+
+
+def criar_funcionario(
+    db: Session,
+    nome: str,
+    login: str,
+    senha: str,
+    papel: str,
+    cpf: str = "",
+    salario: float = 0,
+    dia_vencimento: int = 5,
+    contrato: str = "indefinido",
+    contrato_fim: date | None = None,
+) -> dict:
     limpo = nome.strip()
     usuario_login = login.strip().lower()
     if not limpo or not usuario_login:
@@ -398,7 +708,20 @@ def criar_funcionario(db: Session, nome: str, login: str, senha: str, papel: str
         raise RegraNegocio("Escolha um cargo da loja.", 400)
     if db.query(Usuario).filter(Usuario.login == usuario_login).first():
         raise RegraNegocio("Esse login já existe.", 409)
-    db.add(Usuario(nome=limpo, login=usuario_login, senha_hash=hash_senha(senha), papel=papel))
+    numero, valor, vencimento, tipo, termino = _contrato(cpf, salario, dia_vencimento, contrato or "indefinido", contrato_fim)
+    db.add(
+        Usuario(
+            nome=limpo,
+            login=usuario_login,
+            senha_hash=hash_senha(senha),
+            papel=papel,
+            cpf=numero,
+            salario=valor,
+            dia_vencimento=vencimento,
+            contrato=tipo,
+            contrato_fim=termino,
+        )
+    )
     db.commit()
     return admin_resumo(db)
 
