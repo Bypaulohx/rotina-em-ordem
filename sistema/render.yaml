@@ -3,6 +3,7 @@ services:
     name: rotina
     runtime: docker
     plan: free
+    rootDir: sistema
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /docs

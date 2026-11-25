@@ -19,11 +19,13 @@ SessionLocal = None
 
 
 def database_url() -> str:
-    url = os.environ.get("DATABASE_URL") or os.environ.get("ROTINA_DB") or f"sqlite:///{DB_PATH.as_posix()}"
+    url = (os.environ.get("DATABASE_URL") or os.environ.get("ROTINA_DB") or f"sqlite:///{DB_PATH.as_posix()}").strip()
     if url.startswith("postgres://"):
-        return "postgresql+psycopg://" + url[len("postgres://"):]
-    if url.startswith("postgresql://"):
-        return "postgresql+psycopg://" + url[len("postgresql://"):]
+        url = "postgresql+psycopg://" + url[len("postgres://"):]
+    elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+        url = "postgresql+psycopg://" + url[len("postgresql://"):]
+    if url.startswith("postgresql") and "render.com" in url and "sslmode=" not in url:
+        url += "&sslmode=require" if "?" in url else "?sslmode=require"
     return url
 
 
