@@ -290,6 +290,7 @@ class Produto(Base):
     fornecedor_id: Mapped[int | None] = mapped_column(ForeignKey("fornecedores.id"), nullable=True)
     unidade: Mapped[str] = mapped_column(String(8), default="un")
     foto: Mapped[str] = mapped_column(String(200), default="")
+    especie: Mapped[str] = mapped_column(String(20), default="")
 
 
 class MovimentoEstoque(Base):

@@ -63,6 +63,7 @@ class ProdutoIn(BaseModel):
     preco: float
     estoque: int = 0
     minimo: int = 0
+    especie: str = ""
 
 
 class PrecoIn(BaseModel):
@@ -180,7 +181,7 @@ def ver_catalogo(db: Session = Depends(get_db), _: Usuario = Depends(usuario_atu
 
 @router.post("/produtos")
 def novo_produto(dados: ProdutoIn, db: Session = Depends(get_db), _: Usuario = Depends(usuario_atual)):
-    return _chamar(criar_produto, db, dados.nome, dados.preco, dados.estoque, dados.minimo)
+    return _chamar(criar_produto, db, dados.nome, dados.preco, dados.estoque, dados.minimo, dados.especie)
 
 
 @router.post("/estoque/importar")

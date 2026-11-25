@@ -13,7 +13,7 @@ import {
 } from "./modals.jsx";
 import Loja from "./loja.jsx";
 import Pagina from "./pages.jsx";
-import { GRUPOS, ICONE, ROTULOS_PAPEL, pode, primeiraPagina } from "./ui.jsx";
+import { CampoSenha, GRUPOS, ICONE, ROTULOS_PAPEL, pode, primeiraPagina } from "./ui.jsx";
 
 function Sino({ api, ir }) {
   const [itens, setItens] = useState([]);
@@ -461,7 +461,7 @@ export default function App() {
                     <label className="field"><span>Taxa de atraso</span><input inputMode="numeric" value={taxa} onChange={(evento) => setTaxa(mascaraMoeda(evento.target.value))} required /></label>
                     <label className="field"><span>Seu nome</span><input value={responsavel} onChange={(evento) => setResponsavel(evento.target.value)} autoComplete="name" required /></label>
                     <label className="field"><span>Login</span><input value={login} onChange={(evento) => setLogin(evento.target.value)} autoComplete="username" required /></label>
-                    <label className="field"><span>Senha</span><input type="password" value={senha} onChange={(evento) => setSenha(evento.target.value)} autoComplete="new-password" required /></label>
+                    <label className="field"><span>Senha</span><CampoSenha value={senha} onChange={(evento) => setSenha(evento.target.value)} autoComplete="new-password" required /></label>
                     {erroLogin ? <p className="alerta">{erroLogin}</p> : null}
                     <button className="btn" type="submit">Criar a loja</button>
                   </form>
@@ -473,7 +473,7 @@ export default function App() {
                   <p className="sub">Use o login criado para a sua equipe.</p>
                   <form onSubmit={entrar}>
                     <label className="field"><span>Login</span><input name="login" value={login} onChange={(evento) => setLogin(evento.target.value)} autoComplete="username" required /></label>
-                    <label className="field"><span>Senha</span><input name="senha" type="password" value={senha} onChange={(evento) => setSenha(evento.target.value)} autoComplete="current-password" required /></label>
+                    <label className="field"><span>Senha</span><CampoSenha name="senha" value={senha} onChange={(evento) => setSenha(evento.target.value)} autoComplete="current-password" required /></label>
                     {erroLogin ? <p className="alerta">{erroLogin}</p> : null}
                     <button className="btn" type="submit">Entrar</button>
                   </form>

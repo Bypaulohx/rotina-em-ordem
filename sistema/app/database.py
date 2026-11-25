@@ -117,6 +117,7 @@ def migrar() -> None:
             "fornecedor_id": "INTEGER",
             "unidade": "VARCHAR(8) DEFAULT 'un'",
             "foto": "VARCHAR(200) DEFAULT ''",
+            "especie": "VARCHAR(20) DEFAULT ''",
         },
         "despesas": {
             "status": "VARCHAR(20) DEFAULT 'paga'",

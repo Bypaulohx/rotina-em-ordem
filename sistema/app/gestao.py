@@ -226,13 +226,15 @@ def atualizar_servico(db: Session, servico_id: int, preco: float, preco_feriado:
     return catalogo_loja(db)
 
 
-def criar_produto(db: Session, nome: str, preco: float, estoque: int, minimo: int) -> dict:
+def criar_produto(db: Session, nome: str, preco: float, estoque: int, minimo: int, especie: str = "") -> dict:
     limpo = nome.strip()
     if not limpo:
         raise RegraNegocio("Dê um nome ao produto.", 400)
     if preco < 0 or estoque < 0 or minimo < 0:
         raise RegraNegocio("Preço, estoque e mínimo não podem ser negativos.", 400)
-    produto = Produto(nome=limpo, preco=preco, estoque=estoque, minimo=minimo, ativo=True)
+    if especie and especie not in {"Todos", "Cachorro", "Gato", "Peixe", "Ave", "Roedor", "Réptil"}:
+        raise RegraNegocio("Escolha o animal do produto.", 400)
+    produto = Produto(nome=limpo, preco=preco, estoque=estoque, minimo=minimo, ativo=True, especie=especie)
     db.add(produto)
     db.commit()
     db.refresh(produto)

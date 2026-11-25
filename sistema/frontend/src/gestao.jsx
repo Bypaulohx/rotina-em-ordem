@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PALETA, aplicarCor, diaMes, documento, horaDe, isoDate, mascaraCpf, mascaraTelefone, moeda, tabelaItens } from "./format.js";
 import { ROTULOS_FORMA } from "./format.js";
 import { Bell, Calendar, Landmark, MessageCircle, NotebookPen, Package, PawPrint, ScrollText } from "lucide-react";
-import { Cabecalho, Pill, ROTULOS_PAPEL, Vazio } from "./ui.jsx";
+import { Cabecalho, CampoSenha, Pill, ROTULOS_PAPEL, Vazio } from "./ui.jsx";
 
 function useCarga(api, url) {
   const [dados, setDados] = useState(null);
@@ -296,6 +296,7 @@ function Estoque({ api, run }) {
   const [estoqueInicial, setEstoqueInicial] = useState("0");
   const [minimo, setMinimo] = useState("1");
   const [arquivo, setArquivo] = useState(null);
+  const [especieProduto, setEspecieProduto] = useState("");
   const [resumoImportacao, setResumoImportacao] = useState("");
   const aviso = espera(erro, dados);
   return (
@@ -335,7 +336,7 @@ function Estoque({ api, run }) {
           run(async () => {
             const criado = await api("/api/produtos", {
               method: "POST",
-              body: { nome, preco: Number(preco), estoque: Number(estoqueInicial), minimo: Number(minimo) },
+              body: { nome, preco: Number(preco), estoque: Number(estoqueInicial), minimo: Number(minimo), especie: especieProduto },
             });
             let falha = null;
             if (arquivo && criado.criado) {
@@ -360,6 +361,13 @@ function Estoque({ api, run }) {
           <label className="field"><span>Preço</span><input required type="number" min="0" step="0.01" value={preco} onChange={(evento) => setPreco(evento.target.value)} /></label>
           <label className="field"><span>Estoque inicial</span><input type="number" min="0" value={estoqueInicial} onChange={(evento) => setEstoqueInicial(evento.target.value)} /></label>
           <label className="field"><span>Mínimo</span><input type="number" min="0" value={minimo} onChange={(evento) => setMinimo(evento.target.value)} /></label>
+          <label className="field"><span>Animal</span>
+            <select value={especieProduto} onChange={(evento) => setEspecieProduto(evento.target.value)}>
+              <option value="">Pelo nome do produto</option>
+              <option value="Todos">Todos os animais</option>
+              {["Cachorro", "Gato", "Peixe", "Ave", "Roedor", "Réptil"].map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
           <label className="field"><span>Foto</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(evento) => setArquivo(evento.target.files?.[0] || null)} /></label>
           <button className="btn" type="submit">Salvar produto</button>
         </form>
@@ -649,7 +657,7 @@ function Admin({ api, run }) {
                 <h2>Cadastrar funcionário</h2>
                 <label className="field"><span>Nome</span><input required value={nome} onChange={(evento) => setNome(evento.target.value)} /></label>
                 <label className="field"><span>Login</span><input required value={login} onChange={(evento) => setLogin(evento.target.value)} /></label>
-                <label className="field"><span>Senha</span><input required type="password" value={senha} onChange={(evento) => setSenha(evento.target.value)} /></label>
+                <label className="field"><span>Senha</span><CampoSenha required value={senha} onChange={(evento) => setSenha(evento.target.value)} autoComplete="new-password" /></label>
                 <label className="field">
                   <span>Papel</span>
                   <select value={papel} onChange={(evento) => setPapel(evento.target.value)}>
@@ -831,7 +839,9 @@ function Marca({ api, run, onMarca }) {
   }, [dados]);
   return (
     <>
-      <Cabecalho kicker="Identidade" titulo="Marca" />
+      <Cabecalho kicker="Identidade" titulo="Marca" sub="O nome, a logo e a cor aparecem no site da loja. O endereço é /loja.">
+        <a className="btn ghost" href="/loja" target="_blank" rel="noreferrer">Abrir o site</a>
+      </Cabecalho>
       {aviso || (
         <form className="lista" onSubmit={(evento) => {
           evento.preventDefault();

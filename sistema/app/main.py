@@ -39,6 +39,20 @@ app.include_router(plataforma_router)
 uploads = Path(__file__).resolve().parent.parent / "uploads"
 uploads.mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads), name="uploads")
+def _pasta_videos() -> Path | None:
+    candidatos = [
+        Path(__file__).resolve().parents[2] / "site" / "videos",
+        DIST / "videos",
+    ]
+    for pasta in candidatos:
+        if pasta.is_dir() and any(pasta.iterdir()):
+            return pasta
+    return None
+
+
+videos = _pasta_videos()
+if videos is not None:
+    app.mount("/videos", StaticFiles(directory=videos), name="videos")
 
 
 @app.middleware("http")

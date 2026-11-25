@@ -501,20 +501,37 @@ function Ficha({ ficha, tipo, onVoltar, onPacote }) {
   );
 }
 
+function textoBusca(valor) {
+  return String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 function Pets({ pessoas, acoes, api }) {
   const [ficha, setFicha] = useState(null);
   const [tipo, setTipo] = useState("");
+  const [termo, setTermo] = useState("");
   async function abrir(url, qual) {
     setTipo(qual);
     setFicha(await api(url));
   }
+  const consulta = textoBusca(termo.trim());
+  const digitos = consulta.replace(/\D/g, "");
+  const lista = pessoas.flatMap((cliente) => {
+    if (!consulta) return [cliente];
+    const fone = String(cliente.telefone || "").replace(/\D/g, "");
+    const clienteBate = [cliente.nome, cliente.telefone, cliente.cpf, cliente.cidade, cliente.bairro, cliente.logradouro].some((campo) => textoBusca(campo).includes(consulta))
+      || (digitos.length >= 3 && fone.includes(digitos));
+    if (clienteBate) return [cliente];
+    const pets = cliente.pets.filter((pet) => [pet.nome, pet.especie, pet.raca, pet.cuidados, pet.alimentacao].some((campo) => textoBusca(campo).includes(consulta)));
+    return pets.length ? [{ ...cliente, pets }] : [];
+  });
   if (ficha) return <Ficha ficha={ficha} tipo={tipo} onVoltar={() => setFicha(null)} onPacote={acoes.abrirPacote} />;
   return (
     <>
       <Cabecalho kicker="Cadastro" titulo="Pets & clientes" sub="O serviço nasce do pet: porte, cuidado e o crédito do pacote já vêm com ele.">
         <button className="btn" type="button" onClick={acoes.abrirCliente}>+ Cadastrar</button>
       </Cabecalho>
-      {pessoas.length ? pessoas.map((cliente) => (
+      {pessoas.length ? <input className="busca" placeholder="Buscar pet ou cliente" value={termo} onChange={(evento) => setTermo(evento.target.value)} /> : null}
+      {lista.length ? lista.map((cliente) => (
         <article className="pessoa" key={cliente.id}>
           <button className="linkish" type="button" onClick={() => abrir(`/api/clientes/${cliente.id}`, "cliente")}><strong>{cliente.nome}</strong></button>
           <div className="muted">
@@ -538,7 +555,7 @@ function Pets({ pessoas, acoes, api }) {
             ))}
           </div>
         </article>
-      )) : <Vazio icone={PawPrint} titulo="Nenhum pet ainda" texto="O serviço nasce do pet. Porte, cuidado e o crédito do pacote passam a vir com ele." acao={acoes.abrirCliente} rotulo="Cadastrar" />}
+      )) : <Vazio icone={PawPrint} titulo={pessoas.length ? "Nenhum pet ou cliente com esse termo" : "Nenhum pet ainda"} texto={pessoas.length ? "Tente o nome do pet, do tutor ou o telefone." : "O serviço nasce do pet. Porte, cuidado e o crédito do pacote passam a vir com ele."} acao={pessoas.length ? undefined : acoes.abrirCliente} rotulo="Cadastrar" />}
     </>
   );
 }

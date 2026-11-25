@@ -22,10 +22,15 @@ from .plataforma import (
     importar_afd,
     indicadores,
     ler_notificacao,
+    loja_agenda,
+    loja_agendar,
     loja_cadastrar,
     loja_entrar,
+    loja_horarios,
     loja_pedir,
+    loja_pets,
     loja_produtos,
+    loja_vitrine,
     notificacoes,
     pagar_conta,
     pedidos_cliente,
@@ -156,6 +161,12 @@ class LojaLoginIn(BaseModel):
 class PedidoIn(BaseModel):
     itens: list[dict]
     entrega: str = "retirada"
+
+
+class AgendaLojaIn(BaseModel):
+    pet_id: int
+    servico_id: int
+    inicio: datetime
 
 
 class ReceberPedidoIn(BaseModel):
@@ -336,6 +347,42 @@ async def ponto_afd(arquivo: UploadFile = File(...), db: Session = Depends(get_d
 @router.get("/loja/produtos")
 def vitrine(db: Session = Depends(get_db)):
     return loja_produtos(db)
+
+
+@router.get("/loja/vitrine")
+def vitrine_completa(db: Session = Depends(get_db)):
+    return loja_vitrine(db)
+
+
+@router.get("/loja/pets")
+def pets_da_conta(db: Session = Depends(get_db), cliente: Cliente = Depends(cliente_atual)):
+    return loja_pets(db, cliente.id)
+
+
+@router.post("/loja/pets")
+def pet_da_conta(dados: PetNovoIn, db: Session = Depends(get_db), cliente: Cliente = Depends(cliente_atual)):
+    return _chamar(adicionar_pet, db, cliente.id, dados.model_dump())
+
+
+@router.get("/loja/horarios")
+def horarios_loja(
+    pet_id: int,
+    servico_id: int,
+    dia: date,
+    db: Session = Depends(get_db),
+    cliente: Cliente = Depends(cliente_atual),
+):
+    return _chamar(loja_horarios, db, cliente.id, pet_id, servico_id, dia)
+
+
+@router.get("/loja/agendamentos")
+def agenda_loja(db: Session = Depends(get_db), cliente: Cliente = Depends(cliente_atual)):
+    return loja_agenda(db, cliente.id)
+
+
+@router.post("/loja/agendamentos")
+def agendar_loja(dados: AgendaLojaIn, db: Session = Depends(get_db), cliente: Cliente = Depends(cliente_atual)):
+    return _chamar(loja_agendar, db, cliente.id, dados.pet_id, dados.servico_id, dados.inicio)
 
 
 @router.post("/loja/cadastro")

@@ -1,4 +1,5 @@
-import { BarChart3, Bell, BookOpen, Calendar, Clock, FileText, Landmark, LayoutGrid, Map, MessageCircle, NotebookPen, Package, Palette, PawPrint, ScrollText, Shield, ShoppingBag, Users, Wallet } from "lucide-react";
+import { useState } from "react";
+import { BarChart3, Bell, BookOpen, Calendar, Clock, Eye, EyeOff, FileText, Landmark, LayoutGrid, Map, MessageCircle, NotebookPen, Package, Palette, PawPrint, ScrollText, Shield, ShoppingBag, Users, Wallet } from "lucide-react";
 import { STATUS } from "./format.js";
 
 export const GRUPOS = [
@@ -58,6 +59,19 @@ export function primeiraPagina(papel) {
 }
 
 export const ICONE = { size: 16, strokeWidth: 1.75 };
+
+export function CampoSenha({ value, onChange, ...resto }) {
+  const [visivel, setVisivel] = useState(false);
+  const controlado = value !== undefined;
+  return (
+    <span className="senha">
+      <input type={visivel ? "text" : "password"} {...resto} {...(controlado ? { value, onChange } : {})} />
+      <button className="olho" type="button" aria-pressed={visivel} aria-label={visivel ? "Ocultar senha" : "Mostrar senha"} onClick={() => setVisivel((atual) => !atual)}>
+        {visivel ? <EyeOff {...ICONE} /> : <Eye {...ICONE} />}
+      </button>
+    </span>
+  );
+}
 
 export function Pill({ status }) {
   return <span className={`pill ${status}`}>{STATUS[status] || status}</span>;

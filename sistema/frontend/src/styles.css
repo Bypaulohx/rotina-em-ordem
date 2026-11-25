@@ -98,6 +98,14 @@ input, select, textarea {
 textarea { min-height: 76px; resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .field input[type="checkbox"] { width: auto; min-height: 0; }
+.senha { position: relative; display: block; }
+.senha input { padding-right: 40px; }
+.olho {
+  position: absolute; top: 0; right: 0; width: 36px; height: 100%;
+  border: 0; background: transparent; color: var(--mudo); display: grid; place-items: center; padding: 0;
+}
+.site-painel .olho { color: var(--accent); }
+.site-painel .senha input { padding-right: 44px; }
 .hint { color: var(--mudo); font-size: 12px; margin: 12px 0 0; }
 
 .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
@@ -517,4 +525,101 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   }
   .dialog h2 { font-size: 20px; }
   .baia .acoes .btn { flex: 1; }
+}
+
+.site { min-height: 100vh; background: #f6f6f4; color: #173028; }
+.site-topo {
+  position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 12px; padding: 14px 22px; background: rgba(255,255,255,.92); backdrop-filter: blur(8px);
+}
+.site-acoes, .site-topo .site-pill { justify-self: start; }
+.site-topo .site-pill { justify-self: end; }
+.site-acoes { display: flex; gap: 4px; }
+.site-acoes button, .site-fechar, .site-texto {
+  border: 0; background: transparent; color: var(--accent); padding: 8px; position: relative;
+}
+.site-acoes em {
+  position: absolute; top: 0; right: 0; min-width: 16px; height: 16px; border-radius: 99px;
+  background: var(--accent); color: #fff; font-style: normal; font-size: 11px; line-height: 16px;
+}
+.site-marca { display: flex; justify-content: center; color: var(--accent); text-decoration: none; }
+.site-marca img { height: 42px; width: auto; max-width: 160px; object-fit: contain; }
+.site-marca strong { font-size: 22px; letter-spacing: -0.03em; }
+.site-pill {
+  display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px;
+  background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; padding: 12px 18px;
+}
+.site-pill:disabled { opacity: .45; }
+.site-pill.clara { background: #fff; color: var(--accent); }
+.site-hero {
+  position: relative; min-height: 560px; margin: 8px 18px 0; border-radius: 28px; overflow: hidden; background: var(--accent); color: #fff;
+}
+.site-hero video { position: absolute; top: 0; right: 0; width: 62%; height: 100%; object-fit: cover; }
+.site-velo {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, var(--accent) 0 46%, color-mix(in srgb, var(--accent) 78%, transparent) 58%, color-mix(in srgb, var(--accent) 28%, transparent) 70%, transparent 82%);
+}
+.site-hero-texto { position: relative; z-index: 1; max-width: 680px; padding: 54px 40px 110px; }
+.site-hero h1 { margin: 0 0 28px; font-size: clamp(52px, 8vw, 108px); line-height: .9; letter-spacing: -0.045em; font-weight: 600; }
+.site-especies { position: absolute; left: 18px; right: 18px; bottom: 18px; z-index: 1; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.site-especies button, .site-grade button, .site-horas button {
+  border: 0; background: transparent; color: var(--accent); font-weight: 600;
+}
+.site-especies button { border-radius: 999px; padding: 8px 14px; background: #fff; }
+.site-especies button.ativa, .site-horas button { background: var(--accent); color: #fff; }
+.site-faixa {
+  margin: -36px 0 0; padding: 78px 24px 20px; text-align: center; background: #fff;
+  border-radius: 50% 50% 0 0 / 42px 42px 0 0; color: var(--accent);
+}
+.site-faixa p { max-width: 720px; margin: 0 auto; font-size: clamp(26px, 4vw, 42px); line-height: 1.15; font-weight: 500; letter-spacing: -0.03em; }
+.site-dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 28px 18px; }
+.site-dupla button { position: relative; padding: 0; border-radius: 24px; overflow: hidden; }
+.site-dupla video { width: 100%; height: 280px; object-fit: cover; display: block; }
+.site-dupla span {
+  position: absolute; left: 16px; bottom: 16px; color: #fff; font-size: 28px; font-weight: 600; letter-spacing: -0.03em;
+  text-shadow: 0 1px 8px rgba(0,0,0,.35);
+}
+.site-dupla button.ativa { outline: 3px solid var(--accent); }
+.site-bloco { padding: 12px 18px 28px; }
+.site-bloco h2 { margin: 0 0 14px; font-size: 32px; letter-spacing: -0.03em; }
+.site-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.site-grade article { background: #f1f1ef; border-radius: 28px; padding: 16px 16px 18px; display: flex; flex-direction: column; gap: 6px; min-height: 240px; }
+.site-grade img, .site-sigla { width: 100%; height: 150px; object-fit: contain; }
+.site-sigla { display: grid; place-items: center; font-size: 42px; color: var(--accent); }
+.site-grade h3 { margin: 8px 0 0; font-size: 20px; font-weight: 600; }
+.site-grade p, .site-mudo { margin: 0; color: #5d6b64; }
+.site-grade strong { color: var(--accent); font-size: 18px; }
+.site-grade button { align-self: start; margin-top: auto; padding: 0; }
+.site-linha { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.site-linha input, .site-linha select, .site-painel input, .site-painel select {
+  border: 1px solid #d7ddd8; border-radius: 999px; padding: 12px 14px; background: #fff; min-width: 0;
+}
+.site-horas { display: flex; flex-wrap: wrap; gap: 8px; }
+.site-horas button { border-radius: 999px; padding: 8px 12px; }
+.site-lista { padding: 0; list-style: none; }
+.site-lista li { padding: 8px 0; border-bottom: 1px solid #e4e7e3; }
+.site-rodape { display: flex; justify-content: space-between; gap: 12px; padding: 28px 18px 40px; color: var(--accent); }
+.site-rodape a { color: inherit; }
+.site-toast { position: fixed; left: 16px; bottom: 16px; z-index: 8; max-width: 420px; margin: 0; padding: 12px 14px; border-radius: 16px; background: #173028; color: #fff; }
+.site-aviso { padding: 48px 18px; }
+.site-painel { position: fixed; inset: 0; z-index: 9; }
+.site-fundo { position: absolute; inset: 0; border: 0; background: rgba(23,48,40,.35); }
+.site-painel aside {
+  position: absolute; top: 0; bottom: 0; left: 0; width: min(380px, 92vw); background: #fff; padding: 22px 18px; overflow: auto;
+}
+.site-painel nav { display: flex; flex-direction: column; gap: 14px; margin-top: 24px; font-size: 28px; }
+.site-painel nav a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.site-painel h2 { margin-top: 28px; }
+.site-painel label { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; }
+.site-painel p { display: flex; align-items: center; gap: 8px; }
+.site-painel p span { flex: 1; }
+@media (max-width: 800px) {
+  .site-topo { grid-template-columns: auto 1fr auto; padding: 12px; }
+  .site-pill { padding: 10px 12px; }
+  .site-hero { margin: 8px; min-height: 460px; }
+  .site-hero video { width: 100%; opacity: .45; }
+  .site-velo { background: linear-gradient(180deg, var(--accent) 0 28%, color-mix(in srgb, var(--accent) 82%, transparent) 48%, color-mix(in srgb, var(--accent) 28%, transparent) 100%); }
+  .site-hero-texto { padding: 28px 18px 96px; }
+  .site-dupla, .site-grade { grid-template-columns: 1fr; }
+  .site-especies { right: 12px; bottom: 12px; }
 }

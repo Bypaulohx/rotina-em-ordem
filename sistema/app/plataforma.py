@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 from sqlalchemy import text
@@ -780,11 +780,144 @@ def ponto_painel(db: Session) -> dict:
     return {"marcacoes": saida, "sincronizacoes": syncs}
 
 
+ESPECIES_LOJA = ("Cachorro", "Gato", "Peixe", "Ave", "Roedor", "Réptil")
+
+
+def especie_vitrine(nome: str, categoria: str, gravada: str) -> str:
+    if gravada in ESPECIES_LOJA or gravada == "Todos":
+        return gravada
+    texto = f"{nome} {categoria}".lower()
+    for origem, destino in (("á", "a"), ("ã", "a"), ("â", "a"), ("é", "e"), ("ê", "e"), ("í", "i"), ("ó", "o"), ("õ", "o"), ("ú", "u"), ("ç", "c")):
+        texto = texto.replace(origem, destino)
+    palavras = set(texto.replace("-", " ").split())
+    regras = (
+        ("Cachorro", {"cachorro", "cao", "caes", "canino", "canina"}),
+        ("Gato", {"gato", "gatos", "felino", "areia", "areias"}),
+        ("Peixe", {"peixe", "peixes", "aquario"}),
+        ("Ave", {"ave", "aves", "passaro", "passaros"}),
+        ("Roedor", {"roedor", "roedores", "hamster", "coelho"}),
+        ("Réptil", {"reptil", "repteis", "lagarto", "cobra"}),
+    )
+    for especie, chaves in regras:
+        if palavras & chaves:
+            return especie
+    return "Todos"
+
+
 def loja_produtos(db: Session) -> list[dict]:
     return [
-        _produto_dict(item)
+        {
+            "id": item.id,
+            "nome": item.nome,
+            "preco": item.preco,
+            "estoque": item.estoque,
+            "categoria": item.categoria or "",
+            "foto": item.foto or "",
+            "especie": especie_vitrine(item.nome, item.categoria or "", item.especie or ""),
+        }
         for item in db.query(Produto).filter(Produto.ativo.is_(True), Produto.estoque > 0).order_by(Produto.nome)
     ]
+
+
+def loja_vitrine(db: Session) -> dict:
+    cfg = services.config_loja(db)
+    servicos = [item for item in services.catalogo(db)["servicos"] if item["tipo"] != "hotel"]
+    return {
+        "nome": cfg.nome or "Rotina em ordem",
+        "slogan": cfg.slogan or "Banho, tosa e o que o pet precisa levar para casa.",
+        "logo": cfg.logo or "",
+        "cor": cfg.cor or "#1f6b4a",
+        "whatsapp": cfg.whatsapp or "",
+        "servicos": servicos,
+        "produtos": loja_produtos(db),
+    }
+
+
+def loja_pets(db: Session, cliente_id: int) -> list[dict]:
+    return [
+        {"id": pet.id, "nome": pet.nome, "especie": pet.especie, "porte": pet.porte}
+        for pet in db.query(Pet).filter(Pet.cliente_id == cliente_id).order_by(Pet.nome)
+    ]
+
+
+def _pet_da_conta(db: Session, cliente_id: int, pet_id: int) -> Pet:
+    pet = db.get(Pet, pet_id)
+    if pet is None or pet.cliente_id != cliente_id:
+        raise RegraNegocio("Escolha um pet da sua conta.", 404)
+    return pet
+
+
+def loja_horarios(db: Session, cliente_id: int, pet_id: int, servico_id: int, dia: date) -> list[str]:
+    pet = _pet_da_conta(db, cliente_id, pet_id)
+    servico = services._servico(db, servico_id)
+    if servico.tipo == "hotel":
+        raise RegraNegocio("A hospedagem é combinada direto com a loja.", 400)
+    livres = []
+    agora = datetime.now()
+    for hora in range(8, 18):
+        for minuto in (0, 30):
+            inicio = datetime.combine(dia, time(hora, minuto))
+            if inicio <= agora:
+                continue
+            busca = inicio + timedelta(minutes=servico.duracao_min)
+            try:
+                avaliacao = services.avaliar_salao(db, pet.id, servico.id, inicio, busca)
+            except RegraNegocio:
+                continue
+            if avaliacao.get("ok"):
+                livres.append(inicio.strftime("%H:%M"))
+    return livres
+
+
+def loja_agendar(db: Session, cliente_id: int, pet_id: int, servico_id: int, inicio: datetime) -> dict:
+    pet = _pet_da_conta(db, cliente_id, pet_id)
+    servico = services._servico(db, servico_id)
+    if inicio <= datetime.now():
+        raise RegraNegocio("Escolha um horário que ainda não passou.", 400)
+    agendamento = services.criar_agendamento(
+        db,
+        {
+            "pet_id": pet.id,
+            "servico_id": servico.id,
+            "inicio": inicio,
+            "busca": inicio + timedelta(minutes=servico.duracao_min),
+        },
+    )
+    return {
+        "id": agendamento["id"],
+        "pet": agendamento["pet"],
+        "servico": agendamento["servico"],
+        "inicio": agendamento["inicio"],
+        "busca": agendamento["busca_prevista"],
+        "valor": agendamento["valor_combinado"],
+    }
+
+
+def loja_agenda(db: Session, cliente_id: int) -> list[dict]:
+    ids = [pet.id for pet in db.query(Pet).filter(Pet.cliente_id == cliente_id)]
+    if not ids:
+        return []
+    itens = (
+        db.query(Agendamento)
+        .filter(Agendamento.pet_id.in_(ids))
+        .order_by(Agendamento.inicio.desc())
+        .limit(20)
+        .all()
+    )
+    saida = []
+    for agendamento in itens:
+        dados = services.agendamento_dict(db, agendamento)
+        saida.append(
+            {
+                "id": dados["id"],
+                "pet": dados["pet"],
+                "servico": dados["servico"],
+                "inicio": dados["inicio"],
+                "status": dados["status"],
+                "valor": dados["valor_combinado"],
+            }
+        )
+    return saida
 
 
 def loja_cadastrar(db: Session, dados: dict) -> dict:
